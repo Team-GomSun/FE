@@ -9,6 +9,12 @@
     "start": "next start",
     "lint": "next lint"
   },
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  },
   "dependencies": {
     "next": "15.3.0",
     "react": "^19.0.0",
