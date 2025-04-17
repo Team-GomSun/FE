@@ -92,7 +92,6 @@ export default function Home() {
           }}
           className="h-full w-full object-cover"
           screenshotQuality={1}
-          mirrored={true}
         />
       </div>
 
