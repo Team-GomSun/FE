@@ -1,0 +1,21 @@
+services:
+  app:
+    build: .
+    ports:
+      - '3000:3000'
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - HOST=0.0.0.0
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    ports:
+      - '4040:4040'
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTH_TOKEN}
+    command: http app:3000
+    depends_on:
+      - app
