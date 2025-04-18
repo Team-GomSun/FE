@@ -12,8 +12,8 @@ RUN npm install -g pnpm
 COPY package.json pnpm-lock.yaml* ./
 
 # 의존성 설치
-RUN pnpm install
-
+-RUN pnpm install
++RUN pnpm install --frozen-lockfile
 # 소스 코드 복사
 COPY . .
 
