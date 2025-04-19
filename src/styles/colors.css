@@ -1,0 +1,18 @@
+:root {
+  --background: #ffffff;
+  --foreground: #353535;
+
+  --yellow: #ffde74;
+  --black: #353535;
+
+  --primary: var(--yellow);
+  --primary-hover: #ffd650;
+  --primary-active: #ffce2c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #161616;
+    --foreground: #ffffff;
+  }
+}
