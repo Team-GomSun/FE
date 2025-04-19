@@ -17,7 +17,7 @@ if [ -z "$NGROK_AUTH_TOKEN" ]; then
 fi
 
 # Docker 컨테이너 시작
-docker-compose up -d
+docker compose up -d
 
 # ngrok URL 가져오기 (약간의 시간이 필요할 수 있음)
 echo "ngrok을 시작하는 중... 10초 후 URL을 확인합니다."
@@ -37,4 +37,4 @@ else
   echo "ngrok URL을 가져올 수 없습니다. 직접 http://localhost:4040에서 확인하세요."
 fi
 
-echo "로그를 보려면 다음 명령어를 실행하세요: docker-compose logs -f"
+echo "로그를 보려면 다음 명령어를 실행하세요: docker compose logs -f"
