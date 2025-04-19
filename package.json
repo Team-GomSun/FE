@@ -21,6 +21,7 @@
     "@tensorflow/tfjs-vis": "^1.5.1",
     "@types/crypto-js": "^4.2.2",
     "crypto-js": "^4.2.0",
+    "@use-funnel/browser": "^0.0.14",
     "next": "15.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
