@@ -1,12 +1,11 @@
 'use client';
 
+import LABELS from '@app-datasets/coco/classes.json';
+import * as tf from '@tensorflow/tfjs';
+import '@tensorflow/tfjs-backend-webgl';
+import CryptoJS from 'crypto-js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Webcam from 'react-webcam';
-import * as tf from "@tensorflow/tfjs";
-import "@tensorflow/tfjs-backend-webgl";
-import LABELS from "@app-datasets/coco/classes.json";
-import CryptoJS from 'crypto-js';
-
 
 export default function Home() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -23,11 +22,12 @@ export default function Home() {
   };
 
   //ai 상태 관리 및 참조 변수
+  const modelRef = useRef<tf.GraphModel | null>(null); // useRef로 참조하게 수정
   const [model, setModel] = useState<tf.GraphModel | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [busImages, setBusImages] = useState<string[]>([]);
   const [showImages, setShowImages] = useState(false);
-  const ZOO_MODEL = [{ name: "yolov5", child: ["yolov5n", "yolov5s"] }];
+  const ZOO_MODEL = [{ name: 'yolov5', child: ['yolov5n', 'yolov5s'] }];
   const [modelName] = useState(ZOO_MODEL[0]);
   const [loading, setLoading] = useState(0);
 
@@ -37,14 +37,14 @@ export default function Home() {
   useEffect(() => {
     let isMounted = true;
     let loadedModel: tf.GraphModel | null = null;
-    
+
     const loadModel = async () => {
       try {
         console.log('Starting model load...');
         // Use relative path for model
         const modelPath = `/model/${modelName.name}/${modelName.child[1]}/model.json`;
         console.log('Model path:', modelPath);
-        
+
         // Check if model files exist
         try {
           const response = await fetch(modelPath);
@@ -58,9 +58,10 @@ export default function Home() {
         }
 
         // Dispose previous model if exists
-        if (model) {
+        if (modelRef.current) {
+          // 수정: model 대신 modelRef.current 사용
           console.log('Disposing previous model...');
-          model.dispose();
+          modelRef.current.dispose();
         }
 
         // Set loading state to indicate start
@@ -85,7 +86,7 @@ export default function Home() {
           console.log('Model loaded, warming up...');
           const shape = loadedModel.inputs[0]?.shape || [1, 640, 640, 3];
           console.log('Model input shape:', shape);
-          
+
           const dummy = tf.ones(shape);
           console.log('Running warmup inference...');
           const res = await loadedModel.executeAsync(dummy);
@@ -94,14 +95,16 @@ export default function Home() {
           tf.dispose(res);
           tf.dispose(dummy);
 
-          // save to state
-          setModel(loadedModel);
+          // save to both ref and state
+          modelRef.current = loadedModel; // 모델을 ref에 저장
+          setModel(loadedModel); // 모델을 state에도 저장
           setLoading(1);
           console.log('Model ready');
         }
       } catch (error) {
         console.error('Error loading model:', error);
         if (isMounted) {
+          modelRef.current = null; // 에러 시 ref도 초기화
           setModel(null);
           setLoading(0);
         }
@@ -129,7 +132,10 @@ export default function Home() {
   };
 
   const doPredictFrame = async (imageData: string) => {
-    if (!model) {
+    // ref에서 먼저 모델을 확인하고, 없으면 state에서 확인
+    const modelToUse = modelRef.current || model;
+
+    if (!modelToUse) {
       console.log('Model not loaded');
       return;
     }
@@ -140,7 +146,7 @@ export default function Home() {
       // Create a temporary image element to load the screenshot
       const img = new Image();
       img.src = imageData;
-      
+
       await new Promise((resolve) => {
         img.onload = resolve;
       });
@@ -152,7 +158,7 @@ export default function Home() {
       }
 
       // get width and height from model's shape for resizing image
-      const inputShape = model.inputs[0]?.shape;
+      const inputShape = modelToUse.inputs[0]?.shape; // model 대신 modelToUse 사용
       if (!inputShape) {
         console.log('No input shape found');
         return;
@@ -162,12 +168,15 @@ export default function Home() {
       // pre-processing frame
       const input = tf.tidy(() => {
         const frameTensor = tf.browser.fromPixels(img);
-        return tf.image.resizeBilinear(frameTensor, [modelWidth, modelHeight]).div(255.0).expandDims(0);
+        return tf.image
+          .resizeBilinear(frameTensor, [modelWidth, modelHeight])
+          .div(255.0)
+          .expandDims(0);
       });
 
       // predicting...
       console.log('Running prediction...');
-      const res = await model.executeAsync(input);
+      const res = await modelToUse.executeAsync(input); // model 대신 modelToUse 사용
       if (!Array.isArray(res)) {
         console.log('Model output is not an array');
         return;
@@ -177,16 +186,16 @@ export default function Home() {
       const boxesData = Array.from(boxes.dataSync());
       const scoresData = Array.from(scores.dataSync());
       const classesData = Array.from(classes.dataSync());
-  
+
       console.log('Prediction results:', {
         boxes: boxesData.length,
         scores: scoresData.length,
-        classes: classesData.length
+        classes: classesData.length,
       });
 
       // build the predictions data
       await renderPrediction(boxesData, scoresData, classesData);
-  
+
       // clear memory
       tf.dispose(res);
     } catch (error) {
@@ -197,18 +206,22 @@ export default function Home() {
     }
   };
 
-  const renderPrediction = async (boxesData: number[], scoresData: number[], classesData: number[]) => {
+  const renderPrediction = async (
+    boxesData: number[],
+    scoresData: number[],
+    classesData: number[],
+  ) => {
     if (!canvasRef.current || !webcamRef.current) return;
-    
-    const ctx = canvasRef.current.getContext("2d");
+
+    const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
 
     // clean canvas
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-    const font = "16px sans-serif";
+    const font = '16px sans-serif';
     ctx.font = font;
-    ctx.textBaseline = "top";
+    ctx.textBaseline = 'top';
 
     for (let i = 0; i < scoresData.length; ++i) {
       const klass = LABELS[classesData[i]];
@@ -223,20 +236,20 @@ export default function Home() {
       const height = y2 - y1;
 
       // draw the bounding box
-      ctx.strokeStyle = "#C53030";
+      ctx.strokeStyle = '#C53030';
       ctx.lineWidth = 2;
       ctx.strokeRect(x1, y1, width, height);
 
-      const label = klass + " - " + score + "%";
+      const label = klass + ' - ' + score + '%';
       const textWidth = ctx.measureText(label).width;
       const textHeight = parseInt(font, 10); // base 10
 
       // draw the label background
-      ctx.fillStyle = "#C53030";
+      ctx.fillStyle = '#C53030';
       ctx.fillRect(x1 - 1, y1 - (textHeight + 4), textWidth + 6, textHeight + 4);
 
       // draw the label text
-      ctx.fillStyle = "#FFFFFF";
+      ctx.fillStyle = '#FFFFFF';
       ctx.fillText(label, x1 + 2, y1 - (textHeight + 2));
 
       // If bus is detected, crop and save the image
@@ -255,18 +268,14 @@ export default function Home() {
         // Create an image from the current frame
         const frameImg = new Image();
         frameImg.src = currentFrame;
-        
+
         // Wait for the image to load
         await new Promise((resolve) => {
           frameImg.onload = resolve;
         });
 
         // Crop the image
-        cropCtx.drawImage(
-          frameImg,
-          x1, y1, width, height,
-          0, 0, width, height
-        );
+        cropCtx.drawImage(frameImg, x1, y1, width, height, 0, 0, width, height);
 
         // Convert to data URL
         const croppedImage = cropCanvas.toDataURL('image/jpeg');
@@ -309,14 +318,14 @@ export default function Home() {
             {
               format: 'jpg',
               data: imageData.split(',')[1], // base64 데이터 부분만 추출
-              name: 'bus_number'
-            }
+              name: 'bus_number',
+            },
           ],
           lang: 'ko',
           requestId: 'string',
           timestamp: timestamp,
-          version: 'V1'
-        })
+          version: 'V1',
+        }),
       });
 
       if (!response.ok) {
@@ -335,7 +344,7 @@ export default function Home() {
   // 버스 이미지 저장 및 OCR 처리
   const saveAndProcessBusImage = async (croppedImage: string) => {
     // 이미지 저장
-    setBusImages(prev => {
+    setBusImages((prev) => {
       const newImages = [croppedImage, ...prev];
       return newImages.slice(0, 5);
     });
@@ -456,7 +465,7 @@ export default function Home() {
             <p className="text-sm text-gray-600">분석 중...</p>
           </div>
         ) : null}
-        
+
         <button
           onClick={() => setShowImages(true)}
           className="mt-4 rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
@@ -466,7 +475,7 @@ export default function Home() {
       </div>
 
       {showImages && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
           <div className="w-full max-w-2xl rounded-lg bg-white p-4">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xl font-bold">저장된 버스 이미지</h2>
@@ -480,12 +489,8 @@ export default function Home() {
             <div className="grid grid-cols-2 gap-4">
               {busImages.map((image, index) => (
                 <div key={index} className="relative">
-                  <img
-                    src={image}
-                    alt={`Bus ${index + 1}`}
-                    className="w-full rounded-lg"
-                  />
-                  <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 p-2 text-white">
+                  <img src={image} alt={`Bus ${index + 1}`} className="w-full rounded-lg" />
+                  <div className="bg-opacity-50 absolute right-0 bottom-0 left-0 bg-black p-2 text-white">
                     버스 {index + 1}
                   </div>
                 </div>
