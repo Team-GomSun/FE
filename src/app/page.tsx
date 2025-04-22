@@ -3,9 +3,9 @@
 import LABELS from '@app-datasets/coco/classes.json';
 import * as tf from '@tensorflow/tfjs';
 import '@tensorflow/tfjs-backend-webgl';
-import CryptoJS from 'crypto-js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Webcam from 'react-webcam';
+import { OCRResponse } from '@/types/ocr';
 
 export default function Home() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -287,74 +287,131 @@ export default function Home() {
   };
 
   // OCR API 호출 함수
-  const callOCRAPI = async (imageData: string) => {
+  const callOCRAPI = async (imageData: string): Promise<OCRResponse> => {
     try {
-      const timestamp = Date.now().toString();
-      const accessKey = process.env.NEXT_PUBLIC_NAVER_ACCESS_KEY || '';
-      const secretKey = process.env.NEXT_PUBLIC_NAVER_SECRET_KEY || '';
-      const apiurl = process.env.NEXT_PUBLIC_APIGW_INVOKE_URL || '';
-      // const url = '/v1/vision/ocr';
-      const method = 'POST';
+      console.log('OCR API 호출 시작');
+      const base64Data = imageData.split(',')[1];
+      if (!base64Data) {
+        console.error('이미지 데이터 변환 실패');
+        throw new Error('유효하지 않은 이미지 데이터입니다.');
+      }
 
-      // 시그니처 생성
-      const hmac = CryptoJS.algo.HMAC.create(CryptoJS.algo.SHA256, secretKey);
-      hmac.update(method);
-      hmac.update(' ');
-      // hmac.update(url);
-      hmac.update('\n');
-      hmac.update(timestamp);
-      hmac.update('\n');
-      hmac.update(accessKey);
-
-      // API 호출
-      const response = await fetch(apiurl, {
+      console.log('API 요청 전송');
+      const response = await fetch('/api/ocr', {
         method: 'POST',
         headers: {
-          'X-OCR-SECRET': secretKey,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          images: [
-            {
-              format: 'jpg',
-              data: imageData.split(',')[1], // base64 데이터 부분만 추출
-              name: 'bus_number',
-            },
-          ],
-          lang: 'ko',
-          requestId: 'string',
-          timestamp: timestamp,
-          version: 'V1',
+          imageData: base64Data,
         }),
       });
 
+      console.log('API 응답 수신:', response.status);
+
+      // 응답 상태 확인
       if (!response.ok) {
-        throw new Error('OCR API 호출 실패');
+        let errorMessage = 'API 호출 실패';
+        try {
+          const errorData = await response.json();
+          console.error('API 에러 응답:', errorData);
+          errorMessage = errorData.message || response.statusText;
+        } catch (e) {
+          console.error('에러 응답 파싱 실패:', e);
+          errorMessage = response.statusText;
+        }
+        throw new Error(errorMessage);
       }
 
-      const result = await response.json();
-      console.log('OCR 결과:', result);
+      // 성공 응답을 JSON으로 파싱
+      let result;
+      try {
+        result = await response.json() as OCRResponse;
+        console.log('OCR 결과 수신:', result);
+      } catch (e) {
+        console.error('응답 파싱 에러:', e);
+        throw new Error('API 응답을 파싱할 수 없습니다.');
+      }
+      
+      // OCR 결과 검증
+      if (!result.images || !result.images[0] || !result.images[0].fields) {
+        console.error('잘못된 OCR 결과 형식:', result);
+        throw new Error('OCR 결과 형식이 올바르지 않습니다.');
+      }
+
       return result;
     } catch (error) {
       console.error('OCR API 에러:', error);
-      return null;
+      if (error instanceof Error) {
+        console.error('에러 상세:', {
+          message: error.message,
+          stack: error.stack
+        });
+      }
+      throw error;
     }
   };
 
   // 버스 이미지 저장 및 OCR 처리
   const saveAndProcessBusImage = async (croppedImage: string) => {
-    // 이미지 저장
-    setBusImages((prev) => {
-      const newImages = [croppedImage, ...prev];
-      return newImages.slice(0, 5);
-    });
+    try {
+      console.log('이미지 처리 시작');
+      // 이미지 저장
+      setBusImages((prev) => {
+        const newImages = [croppedImage, ...prev];
+        return newImages.slice(0, 5);
+      });
 
-    // OCR API 호출
-    const ocrResult = await callOCRAPI(croppedImage);
-    if (ocrResult) {
-      // OCR 결과 처리
-      console.log('버스 번호 인식 결과:', ocrResult);
-      // 여기에 OCR 결과를 상태로 저장하거나 다른 처리를 추가할 수 있습니다
+      console.log('OCR API 호출');
+      const ocrResult = await callOCRAPI(croppedImage);
+      
+      if (ocrResult) {
+        console.log('OCR 결과 처리');
+        const busNumber = extractBusNumber(ocrResult);
+        if (busNumber) {
+          console.log('버스 번호 인식 성공:', busNumber);
+        } else {
+          console.log('버스 번호를 찾을 수 없음');
+        }
+      }
+    } catch (error) {
+      console.error('이미지 처리 중 에러:', error);
+      if (error instanceof Error) {
+        console.error('에러 상세:', {
+          message: error.message,
+          stack: error.stack
+        });
+      }
+    }
+  };
+
+  // 버스 번호 추출 함수
+  const extractBusNumber = (ocrResult: OCRResponse): string | null => {
+    try {
+      const fields = ocrResult.images[0].fields;
+      if (!fields || !fields.length) return null;
+      console.log('fields 전체 내용: ', fields);
+      //버스 번호 패턴 
+      const busNumberPatterns = [
+        /^\d{1,4}[-\s]?\d{1,4}$/, // 일반 버스 (1, 1234-5678)
+        /^[가-힣]\d{1,4}$/,       // 마을버스 (강남1)
+        /^[A-Z]\d{1,4}$/,         // 공항버스 (A1)
+        /^[가-힣]\d{1,4}[-\s]?\d{1,4}$/ // 지선버스 (강남1-1234) 더 있으면 추후 추가
+      ];
+      
+      for (const field of fields) { 
+        const text = field.inferText.replace(/\s/g, '');
+        for (const pattern of busNumberPatterns) {
+          if (pattern.test(text)) {
+            return text;
+          }
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('버스 번호 추출 중 에러:', error);
+      return null;
     }
   };
 
