@@ -3,7 +3,6 @@
 import LABELS from '@app-datasets/coco/classes.json';
 import * as tf from '@tensorflow/tfjs';
 import '@tensorflow/tfjs-backend-webgl';
-import CryptoJS from 'crypto-js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Webcam from 'react-webcam';
 
@@ -289,42 +288,13 @@ export default function Home() {
   // OCR API 호출 함수
   const callOCRAPI = async (imageData: string) => {
     try {
-      const timestamp = Date.now().toString();
-      const accessKey = process.env.NEXT_PUBLIC_NAVER_ACCESS_KEY || '';
-      const secretKey = process.env.NEXT_PUBLIC_NAVER_SECRET_KEY || '';
-      const apiurl = process.env.NEXT_PUBLIC_APIGW_INVOKE_URL || '';
-      // const url = '/v1/vision/ocr';
-      const method = 'POST';
-
-      // 시그니처 생성
-      const hmac = CryptoJS.algo.HMAC.create(CryptoJS.algo.SHA256, secretKey);
-      hmac.update(method);
-      hmac.update(' ');
-      // hmac.update(url);
-      hmac.update('\n');
-      hmac.update(timestamp);
-      hmac.update('\n');
-      hmac.update(accessKey);
-
-      // API 호출
-      const response = await fetch(apiurl, {
+      const response = await fetch('/api/ocr', {
         method: 'POST',
         headers: {
-          'X-OCR-SECRET': secretKey,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          images: [
-            {
-              format: 'jpg',
-              data: imageData.split(',')[1], // base64 데이터 부분만 추출
-              name: 'bus_number',
-            },
-          ],
-          lang: 'ko',
-          requestId: 'string',
-          timestamp: timestamp,
-          version: 'V1',
+          imageData: imageData,
         }),
       });
 
