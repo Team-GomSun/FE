@@ -1,5 +1,6 @@
 'use client';
 
+import { useModel } from '@/context/ModelContext';
 import LABELS from '@app-datasets/coco/classes.json';
 import * as tf from '@tensorflow/tfjs';
 import '@tensorflow/tfjs-backend-webgl';
@@ -7,6 +8,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Webcam from 'react-webcam';
 
 export default function CameraPage() {
+  const { model: globalModel, loading: globalLoading } = useModel();
+
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const webcamRef = useRef<Webcam>(null);
   const captureInterval = useRef<NodeJS.Timeout | null>(null);
@@ -22,105 +25,19 @@ export default function CameraPage() {
 
   //ai 상태 관리 및 참조 변수
   const modelRef = useRef<tf.GraphModel | null>(null); // useRef로 참조하게 수정
-  const [model, setModel] = useState<tf.GraphModel | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [busImages, setBusImages] = useState<string[]>([]);
   const [showImages, setShowImages] = useState(false);
-  const ZOO_MODEL = [{ name: 'yolov5', child: ['yolov5n', 'yolov5s'] }];
-  const [modelName] = useState(ZOO_MODEL[0]);
-  const [loading, setLoading] = useState(0);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   //ai 모델 로딩 함수
+  // 글로벌 모델이 로드되면 modelRef에 저장
   useEffect(() => {
-    let isMounted = true;
-    let loadedModel: tf.GraphModel | null = null;
-
-    const loadModel = async () => {
-      try {
-        console.log('Starting model load...');
-        // Use relative path for model
-        const modelPath = `/model/${modelName.name}/${modelName.child[1]}/model.json`;
-        console.log('Model path:', modelPath);
-
-        // Check if model files exist
-        try {
-          const response = await fetch(modelPath);
-          if (!response.ok) {
-            throw new Error(`Model file not found: ${response.status}`);
-          }
-          console.log('Model file exists, starting to load...');
-        } catch (error) {
-          console.error('Model file check failed:', error);
-          throw error;
-        }
-
-        // Dispose previous model if exists
-        if (modelRef.current) {
-          // 수정: model 대신 modelRef.current 사용
-          console.log('Disposing previous model...');
-          modelRef.current.dispose();
-        }
-
-        // Set loading state to indicate start
-        if (isMounted) {
-          setLoading(0.1);
-        }
-
-        loadedModel = await tf.loadGraphModel(modelPath, {
-          onProgress: (fractions) => {
-            console.log('Loading progress:', fractions);
-            if (isMounted) {
-              setLoading(fractions);
-            }
-          },
-        });
-
-        if (!loadedModel) {
-          throw new Error('Model loading failed');
-        }
-
-        if (isMounted) {
-          console.log('Model loaded, warming up...');
-          const shape = loadedModel.inputs[0]?.shape || [1, 640, 640, 3];
-          console.log('Model input shape:', shape);
-
-          const dummy = tf.ones(shape);
-          console.log('Running warmup inference...');
-          const res = await loadedModel.executeAsync(dummy);
-
-          // clear memory
-          tf.dispose(res);
-          tf.dispose(dummy);
-
-          // save to both ref and state
-          modelRef.current = loadedModel; // 모델을 ref에 저장
-          setModel(loadedModel); // 모델을 state에도 저장
-          setLoading(1);
-          console.log('Model ready');
-        }
-      } catch (error) {
-        console.error('Error loading model:', error);
-        if (isMounted) {
-          modelRef.current = null; // 에러 시 ref도 초기화
-          setModel(null);
-          setLoading(0);
-        }
-      }
-    };
-
-    // Load model immediately
-    loadModel();
-
-    return () => {
-      isMounted = false;
-      if (loadedModel) {
-        console.log('Cleaning up model...');
-        loadedModel.dispose();
-      }
-    };
-  }, [modelName]);
+    if (globalModel) {
+      modelRef.current = globalModel;
+    }
+  }, [globalModel]);
 
   // 여기에서 이미지를 처리하면 될 것 같아요
   const sendImageToServer = async (imageData: string) => {
@@ -131,8 +48,8 @@ export default function CameraPage() {
   };
 
   const doPredictFrame = async (imageData: string) => {
-    // ref에서 먼저 모델을 확인하고, 없으면 state에서 확인
-    const modelToUse = modelRef.current || model;
+    // ref에서 먼저 모델을 확인하고, 없으면 글로벌 모델을 사용
+    const modelToUse = modelRef.current || globalModel;
 
     if (!modelToUse) {
       console.log('Model not loaded');
@@ -361,7 +278,7 @@ export default function CameraPage() {
   }, [hasPermission, continuousCapture]);
 
   // 모델 로딩 상태에 따른 UI 처리
-  if (loading < 1) {
+  if (globalLoading < 1) {
     return (
       <div className="flex h-screen flex-col items-center justify-center">
         <div className="text-center">
@@ -369,10 +286,10 @@ export default function CameraPage() {
           <div className="w-64 rounded-full bg-gray-200">
             <div
               className="h-2 rounded-full bg-blue-500 transition-all duration-300"
-              style={{ width: `${loading * 100}%` }}
+              style={{ width: `${globalLoading * 100}%` }}
             />
           </div>
-          <p className="mt-2 text-sm text-gray-600">{Math.round(loading * 100)}%</p>
+          <p className="mt-2 text-sm text-gray-600">{Math.round(globalLoading * 100)}%</p>
         </div>
       </div>
     );
@@ -426,9 +343,11 @@ export default function CameraPage() {
 
       <div className="mt-4 pb-2 text-center">
         <p className="text-lg font-medium">버스를 프레임 안에 위치시키세요</p>
-        {loading < 1 ? (
+        {globalLoading < 1 ? (
           <div className="mt-2">
-            <p className="text-sm text-gray-600">모델 로딩 중... {Math.round(loading * 100)}%</p>
+            <p className="text-sm text-gray-600">
+              모델 로딩 중... {Math.round(globalLoading * 100)}%
+            </p>
           </div>
         ) : isAnalyzing ? (
           <div className="mt-2">
