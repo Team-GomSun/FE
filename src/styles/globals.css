@@ -1,0 +1,17 @@
+@import 'tailwindcss';
+@import './colors.css';
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --font-pretendard: var(--font-pretendard, ui-sans-serif, system-ui, sans-serif);
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-pretendard);
+}
