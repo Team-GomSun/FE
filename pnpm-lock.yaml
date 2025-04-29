@@ -1003,6 +1003,8 @@ packages:
       {
         integrity: sha512-1aSj/F+yRCwDEcWG9JWVkXLSqio8UiLm4NMQMRLwpRT5GXuwY6/4SiP6DaDtABa1DGVOW8dbFcH1q2hfzByvlw==,
       }
+  '@use-funnel/browser@0.0.14':
+    resolution: {integrity: sha512-1aSj/F+yRCwDEcWG9JWVkXLSqio8UiLm4NMQMRLwpRT5GXuwY6/4SiP6DaDtABa1DGVOW8dbFcH1q2hfzByvlw==}
     peerDependencies:
       react: '>=16.8'
 
@@ -1011,6 +1013,7 @@ packages:
       {
         integrity: sha512-a0T4mWXeL+ouMXtmyZn8MbrPZd9JgvFP9iAGAiaiuCvU3tj1jEWCvRjWfLVup3otH/3BBpf4zyi/v28/eLR9PQ==,
       }
+    resolution: {integrity: sha512-a0T4mWXeL+ouMXtmyZn8MbrPZd9JgvFP9iAGAiaiuCvU3tj1jEWCvRjWfLVup3otH/3BBpf4zyi/v28/eLR9PQ==}
     peerDependencies:
       react: '>=16.8'
 
