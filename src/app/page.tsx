@@ -34,13 +34,13 @@ export default function Home() {
 
       console.log('OCR API 호출');
       const ocrResult = await callOCRAPI(croppedImage);
-      
+
       if (ocrResult) {
         // console.log('OCR 결과 처리');
         const busNumber = extractBusNumber(ocrResult);
         if (busNumber) {
           console.log('버스 번호 인식 성공:', busNumber);
-          setBusNumbers(prev => [busNumber, ...prev]);
+          setBusNumbers((prev) => [busNumber, ...prev]);
         } else {
           console.log('버스 번호를 찾을 수 없음', ocrResult);
         }
@@ -52,13 +52,13 @@ export default function Home() {
 
   // 모델 및 예측 훅 사용
   const { modelRef, loading, isAnalyzing, setAnalyzing } = useModel(modelName);
-  
+
   const { doPredictFrame } = usePrediction({
     modelRef,
     canvasRef: canvasRef as React.RefObject<HTMLCanvasElement>,
     webcamRef: webcamRef as React.RefObject<Webcam>,
     setAnalyzing,
-    onBusDetected: saveAndProcessBusImage
+    onBusDetected: saveAndProcessBusImage,
   });
 
   // 버스 번호 다운로드 함수
@@ -83,12 +83,15 @@ export default function Home() {
       .catch(() => setHasPermission(false));
   }, []);
 
-  const sendImageToServer = useCallback(async (imageData: string) => {
-    // console.log('이미지', imageData);
-    if (imageData) {
-      doPredictFrame(imageData);
-    }
-  }, [doPredictFrame]);
+  const sendImageToServer = useCallback(
+    async (imageData: string) => {
+      // console.log('이미지', imageData);
+      if (imageData) {
+        doPredictFrame(imageData);
+      }
+    },
+    [doPredictFrame],
+  );
 
   const capture = useCallback(() => {
     const imageSrc = webcamRef.current?.getScreenshot();
@@ -215,13 +218,13 @@ export default function Home() {
                 >
                   버스 번호 다운로드
                 </button>
-              <button
-                onClick={() => setShowImages(false)}
-                className="rounded-lg bg-gray-200 px-4 py-2 hover:bg-gray-300"
-              >
-                닫기
-              </button>
-            </div>
+                <button
+                  onClick={() => setShowImages(false)}
+                  className="rounded-lg bg-gray-200 px-4 py-2 hover:bg-gray-300"
+                >
+                  닫기
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               {busImages.map((image, index) => (

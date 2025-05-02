@@ -96,6 +96,6 @@ export const useModel = (modelName: { name: string; child: string[] }): ModelSta
     loading,
     isAnalyzing,
     updateModel,
-    setAnalyzing: setIsAnalyzing
+    setAnalyzing: setIsAnalyzing,
   };
 };
