@@ -1,8 +1,11 @@
 'use client';
 
+import { BusNumberRequest, postUsersBusNumber } from '@/app/api/postUsersBusNumber';
+import { useMutation } from '@tanstack/react-query';
 import { useFunnel } from '@use-funnel/browser';
 import Image from 'next/image';
 import { useState } from 'react';
+import { saveUserId } from '../api/userUtils';
 import { VoiceInputSection } from './VoiceInputSection';
 
 type BusSearchFunnelSteps = {
@@ -20,6 +23,18 @@ export default function BusSearchFunnel() {
     initial: {
       step: 'selectInputMethod',
       context: {} as Record<string, never>,
+    },
+  });
+
+  const mutation = useMutation({
+    mutationFn: (data: BusNumberRequest) => postUsersBusNumber(data),
+    onSuccess: (data) => {
+      if (data && data.result && data.result.userId) {
+        saveUserId(data.result.userId);
+
+        alert(`버스 번호가 등록되었습니다.`);
+        window.location.href = '/';
+      }
     },
   });
 
@@ -115,20 +130,30 @@ export default function BusSearchFunnel() {
 
       <p className="text-center text-xl text-[#353535]">이 버스가 맞나요?</p>
 
+      {mutation.error && (
+        <p className="text-center text-sm text-red-500">
+          {mutation.error instanceof Error
+            ? mutation.error.message
+            : '서버 통신 중 오류가 발생했습니다.'}
+        </p>
+      )}
+
       <div className="flex w-full space-x-4">
         <button
           onClick={() => history.back()}
           className="flex-1 rounded-lg bg-gray-200 py-3 text-center text-xl font-medium text-[#353535] transition-colors hover:bg-gray-300"
+          disabled={mutation.isPending}
         >
           아니오
         </button>
         <button
           onClick={() => {
-            alert(`${context.busNumber} 버스를 선택하셨습니다.`);
+            mutation.mutate({ busNumber: context.busNumber });
           }}
-          className="flex-1 rounded-lg bg-[#ffde74] py-3 text-center text-xl font-bold text-[#353535] transition-colors hover:bg-yellow-300"
+          className={`flex-1 rounded-lg ${mutation.isPending ? 'bg-gray-300' : 'bg-[#ffde74] hover:bg-yellow-300'} py-3 text-center text-xl font-bold text-[#353535] transition-colors`}
+          disabled={mutation.isPending}
         >
-          예
+          {mutation.isPending ? '처리 중...' : '예'}
         </button>
       </div>
     </div>
