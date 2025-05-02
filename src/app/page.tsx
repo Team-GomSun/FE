@@ -7,6 +7,7 @@ import { useModel } from '@/hooks/useModel';
 import { usePrediction } from '@/hooks/usePrediction';
 import { callOCRAPI, extractBusNumber } from '@/utils/ocr';
 
+
 export default function Home() {
   // 상태 관리
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -92,6 +93,7 @@ export default function Home() {
     },
     [doPredictFrame],
   );
+
 
   const capture = useCallback(() => {
     const imageSrc = webcamRef.current?.getScreenshot();
@@ -225,6 +227,7 @@ export default function Home() {
                   닫기
                 </button>
               </div>
+
             </div>
             <div className="grid grid-cols-2 gap-4">
               {busImages.map((image, index) => (
