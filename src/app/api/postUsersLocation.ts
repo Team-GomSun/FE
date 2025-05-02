@@ -1,7 +1,8 @@
 import { apiClient } from './apiClient';
+import { getUserId } from './userUtils';
 
 export interface LocationData {
-  userId: number;
+  userId?: number;
   latitude: number;
   longitude: number;
 }
@@ -13,10 +14,24 @@ export interface LocationResponse {
 }
 
 export const postUserLocation = async (data: LocationData): Promise<LocationResponse> => {
+  const userId = getUserId();
+
+  if (!userId) {
+    console.error('사용자 ID를 찾을 수 없습니다.');
+    return {
+      isSuccess: false,
+      code: 400,
+      message: '사용자 ID를 찾을 수 없습니다. 버스 번호를 다시 등록해주세요.',
+    };
+  }
+
   try {
     const response = await apiClient
       .post('users/location', {
-        json: data,
+        json: {
+          ...data,
+          userId,
+        },
       })
       .json<LocationResponse>();
 
