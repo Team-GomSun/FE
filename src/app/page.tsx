@@ -326,7 +326,7 @@ export default function Home() {
       // 성공 응답을 JSON으로 파싱
       let result;
       try {
-        result = await response.json() as OCRResponse;
+        result = (await response.json()) as OCRResponse;
         // console.log('OCR 결과 수신:', result);
       } catch (e) {
         console.error('응답 파싱 에러:', e);
@@ -371,7 +371,7 @@ export default function Home() {
         if (busNumber) {
           console.log('버스 번호 인식 성공:', busNumber);
         } else {
-          console.log('버스 번호를 찾을 수 없음', ocrResult.images[0].fields);
+          console.log('버스 번호를 찾을 수 없음',  ocrResult.images[0].fields);
         }
       }
     } catch (error) {
@@ -390,7 +390,7 @@ export default function Home() {
     try {
       const fields = ocrResult.images[0].fields;
       if (!fields || !fields.length) return null;
-      // console.log('fields 전체 내용: ', fields);
+      console.log('fields 전체 내용: ', fields);
       //버스 번호 패턴 
       const busNumberPatterns = [
         /^\d{1,4}[-\s]?\d{1,4}$/, // 일반 버스 (1, 1234-5678)
