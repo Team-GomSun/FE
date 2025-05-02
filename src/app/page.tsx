@@ -332,7 +332,7 @@ export default function Home() {
         console.error('응답 파싱 에러:', e);
         throw new Error('API 응답을 파싱할 수 없습니다.');
       }
-      
+
       // OCR 결과 검증
       if (!result.images || !result.images[0] || !result.images[0].fields) {
         console.error('잘못된 OCR 결과 형식:', result);
@@ -345,7 +345,7 @@ export default function Home() {
       if (error instanceof Error) {
         console.error('에러 상세:', {
           message: error.message,
-          stack: error.stack
+          stack: error.stack,
         });
       }
       throw error;
@@ -364,14 +364,14 @@ export default function Home() {
 
       // console.log('OCR API 호출');
       const ocrResult = await callOCRAPI(croppedImage);
-      
+
       if (ocrResult) {
         // console.log('OCR 결과 처리');
         const busNumber = extractBusNumber(ocrResult);
         if (busNumber) {
           console.log('버스 번호 인식 성공:', busNumber);
         } else {
-          console.log('버스 번호를 찾을 수 없음',  ocrResult.images[0].fields);
+          console.log('버스 번호를 찾을 수 없음', ocrResult.images[0].fields);
         }
       }
     } catch (error) {
@@ -379,7 +379,7 @@ export default function Home() {
       if (error instanceof Error) {
         console.error('에러 상세:', {
           message: error.message,
-          stack: error.stack
+          stack: error.stack,
         });
       }
     }
@@ -391,15 +391,15 @@ export default function Home() {
       const fields = ocrResult.images[0].fields;
       if (!fields || !fields.length) return null;
       console.log('fields 전체 내용: ', fields);
-      //버스 번호 패턴 
+      //버스 번호 패턴
       const busNumberPatterns = [
         /^\d{1,4}[-\s]?\d{1,4}$/, // 일반 버스 (1, 1234-5678)
-        /^[가-힣]\d{1,4}$/,       // 마을버스 (강남1)
-        /^[A-Z]\d{1,4}$/,         // 공항버스 (A1)
-        /^[가-힣]\d{1,4}[-\s]?\d{1,4}$/ // 지선버스 (강남1-1234) 더 있으면 추후 추가
+        /^[가-힣]\d{1,4}$/, // 마을버스 (강남1)
+        /^[A-Z]\d{1,4}$/, // 공항버스 (A1)
+        /^[가-힣]\d{1,4}[-\s]?\d{1,4}$/, // 지선버스 (강남1-1234) 더 있으면 추후 추가
       ];
-      
-      for (const field of fields) { 
+
+      for (const field of fields) {
         const text = field.inferText.replace(/\s/g, '');
         for (const pattern of busNumberPatterns) {
           if (pattern.test(text)) {
@@ -407,7 +407,7 @@ export default function Home() {
           }
         }
       }
-      
+
       return null;
     } catch (error) {
       console.error('버스 번호 추출 중 에러:', error);
