@@ -125,7 +125,7 @@ export default function Home() {
 
   // 여기에서 이미지를 처리하면 될 것 같아요
   const sendImageToServer = async (imageData: string) => {
-    console.log('이미지', imageData);
+    // console.log('이미지', imageData);
     if (imageData) {
       doPredictFrame(imageData);
     }
@@ -187,11 +187,11 @@ export default function Home() {
       const scoresData = Array.from(scores.dataSync());
       const classesData = Array.from(classes.dataSync());
 
-      console.log('Prediction results:', {
-        boxes: boxesData.length,
-        scores: scoresData.length,
-        classes: classesData.length,
-      });
+      // console.log('Prediction results:', {
+      //   boxes: boxesData.length,
+      //   scores: scoresData.length,
+      //   classes: classesData.length,
+      // });
 
       // build the predictions data
       await renderPrediction(boxesData, scoresData, classesData);
@@ -289,14 +289,14 @@ export default function Home() {
   // OCR API 호출 함수
   const callOCRAPI = async (imageData: string): Promise<OCRResponse> => {
     try {
-      console.log('OCR API 호출 시작');
+      // console.log('OCR API 호출 시작');
       const base64Data = imageData.split(',')[1];
       if (!base64Data) {
         console.error('이미지 데이터 변환 실패');
         throw new Error('유효하지 않은 이미지 데이터입니다.');
       }
 
-      console.log('API 요청 전송');
+      // console.log('API 요청 전송');
       const response = await fetch('/api/ocr', {
         method: 'POST',
         headers: {
@@ -307,7 +307,7 @@ export default function Home() {
         }),
       });
 
-      console.log('API 응답 수신:', response.status);
+      // console.log('API 응답 수신:', response.status);
 
       // 응답 상태 확인
       if (!response.ok) {
@@ -327,7 +327,7 @@ export default function Home() {
       let result;
       try {
         result = await response.json() as OCRResponse;
-        console.log('OCR 결과 수신:', result);
+        // console.log('OCR 결과 수신:', result);
       } catch (e) {
         console.error('응답 파싱 에러:', e);
         throw new Error('API 응답을 파싱할 수 없습니다.');
@@ -355,23 +355,23 @@ export default function Home() {
   // 버스 이미지 저장 및 OCR 처리
   const saveAndProcessBusImage = async (croppedImage: string) => {
     try {
-      console.log('이미지 처리 시작');
+      // console.log('이미지 처리 시작');
       // 이미지 저장
       setBusImages((prev) => {
         const newImages = [croppedImage, ...prev];
         return newImages.slice(0, 5);
       });
 
-      console.log('OCR API 호출');
+      // console.log('OCR API 호출');
       const ocrResult = await callOCRAPI(croppedImage);
       
       if (ocrResult) {
-        console.log('OCR 결과 처리');
+        // console.log('OCR 결과 처리');
         const busNumber = extractBusNumber(ocrResult);
         if (busNumber) {
           console.log('버스 번호 인식 성공:', busNumber);
         } else {
-          console.log('버스 번호를 찾을 수 없음');
+          console.log('버스 번호를 찾을 수 없음', ocrResult.images[0].fields);
         }
       }
     } catch (error) {
@@ -390,7 +390,7 @@ export default function Home() {
     try {
       const fields = ocrResult.images[0].fields;
       if (!fields || !fields.length) return null;
-      console.log('fields 전체 내용: ', fields);
+      // console.log('fields 전체 내용: ', fields);
       //버스 번호 패턴 
       const busNumberPatterns = [
         /^\d{1,4}[-\s]?\d{1,4}$/, // 일반 버스 (1, 1234-5678)
@@ -429,7 +429,7 @@ export default function Home() {
 
     captureInterval.current = setInterval(() => {
       capture();
-    }, 3000);
+    }, 1000);
   }, [capture]);
 
   useEffect(() => {
