@@ -5,7 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useFunnel } from '@use-funnel/browser';
 import Image from 'next/image';
 import { useState } from 'react';
-import { saveUserId } from '../api/userUtils';
+import { saveBusNumber, saveUserId } from '../api/userUtils';
 import { VoiceInputSection } from './VoiceInputSection';
 
 type BusSearchFunnelSteps = {
@@ -31,6 +31,8 @@ export default function BusSearchFunnel() {
     onSuccess: (data) => {
       if (data && data.result && data.result.userId) {
         saveUserId(data.result.userId);
+
+        saveBusNumber(busNumber);
 
         alert(`버스 번호가 등록되었습니다.`);
         window.location.href = '/';
