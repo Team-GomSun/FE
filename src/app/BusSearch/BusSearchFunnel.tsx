@@ -4,6 +4,7 @@ import { BusNumberRequest, postUsersBusNumber } from '@/app/api/postUsersBusNumb
 import { useMutation } from '@tanstack/react-query';
 import { useFunnel } from '@use-funnel/browser';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { saveBusNumber, saveUserId } from '../api/userUtils';
 import { VoiceInputSection } from './VoiceInputSection';
@@ -17,6 +18,7 @@ type BusSearchFunnelSteps = {
 
 export default function BusSearchFunnel() {
   const [busNumber, setBusNumber] = useState<string>('');
+  const router = useRouter();
 
   const funnel = useFunnel<BusSearchFunnelSteps>({
     id: 'bus-search-funnel',
@@ -35,7 +37,7 @@ export default function BusSearchFunnel() {
         saveBusNumber(busNumber);
 
         alert(`버스 번호가 등록되었습니다.`);
-        window.location.href = '/';
+        router.push('/Camera');
       }
     },
   });
