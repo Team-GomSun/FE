@@ -2,10 +2,12 @@
 
 import { OCRResponse } from '@/types/ocr';
 import LABELS from '@app-datasets/coco/classes.json';
+import { useQuery } from '@tanstack/react-query';
 import * as tf from '@tensorflow/tfjs';
 import '@tensorflow/tfjs-backend-webgl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Webcam from 'react-webcam';
+import { BusInfo, getBusArrival } from '../api/getBusArrival';
 
 export default function Camera() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -30,8 +32,17 @@ export default function Camera() {
   const ZOO_MODEL = [{ name: 'yolov5', child: ['yolov5n', 'yolov5s'] }];
   const [modelName] = useState(ZOO_MODEL[0]);
   const [loading, setLoading] = useState(0);
+  const [detectedBus, setDetectedBus] = useState<string | null>(null);
+  const [isDetectedBusArriving, setIsDetectedBusArriving] = useState(false);
+  const [showNotification, setShowNotification] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const { data: expectedBuses = [] } = useQuery<BusInfo[]>({
+    queryKey: ['busArrivals'],
+    queryFn: getBusArrival,
+    refetchInterval: 30000, // 30초
+  });
 
   //ai 모델 로딩 함수
   useEffect(() => {
@@ -227,6 +238,9 @@ export default function Camera() {
       const klass = LABELS[classesData[i]];
       const score = (scoresData[i] * 100).toFixed(1);
 
+      // Only process if the score is above 40%
+      if (parseFloat(score) < 40) continue;
+
       let [x1, y1, x2, y2] = boxesData.slice(i * 4, (i + 1) * 4);
       x1 *= canvasRef.current.width;
       x2 *= canvasRef.current.width;
@@ -352,6 +366,24 @@ export default function Camera() {
     }
   };
 
+  const checkBusMatch = (busNumber: string) => {
+    if (!busNumber || !expectedBuses || expectedBuses.length === 0) {
+      return false;
+    }
+
+    for (let i = 0; i < expectedBuses.length; i++) {
+      const bus = expectedBuses[i];
+
+      if (!bus || !bus.busNumber) continue;
+
+      if (String(bus.busNumber) === String(busNumber)) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
   // 버스 이미지 저장 및 OCR 처리
   const saveAndProcessBusImage = async (croppedImage: string) => {
     try {
@@ -370,6 +402,15 @@ export default function Camera() {
         const busNumber = extractBusNumber(ocrResult);
         if (busNumber) {
           console.log('버스 번호 인식 성공:', busNumber);
+          setDetectedBus(busNumber);
+
+          const isMatching = checkBusMatch(busNumber);
+          setIsDetectedBusArriving(isMatching);
+
+          if (isMatching) {
+            setShowNotification(true);
+            setTimeout(() => setShowNotification(false), 5000);
+          }
         } else {
           console.log('버스 번호를 찾을 수 없음', ocrResult.images[0].fields);
         }
@@ -509,26 +550,67 @@ export default function Camera() {
           className="absolute top-0 left-0 h-full w-full"
           style={{ zIndex: 1 }}
         />
+
+        {/* Bus Arrival Notification */}
+        {showNotification && (
+          <div
+            className="absolute top-4 right-0 left-0 mx-auto w-4/5 rounded-lg bg-green-500 p-4 text-center text-white shadow-lg"
+            style={{ zIndex: 2 }}
+          >
+            <p className="text-lg font-bold">도착 예정 버스 발견!</p>
+            <p>{detectedBus} 번 버스가 곧 도착합니다</p>
+          </div>
+        )}
       </div>
 
-      <div className="mt-4 pb-2 text-center">
-        <p className="text-lg font-medium">버스를 프레임 안에 위치시키세요</p>
-        {loading < 1 ? (
-          <div className="mt-2">
-            <p className="text-sm text-gray-600">모델 로딩 중... {Math.round(loading * 100)}%</p>
+      <div className="mt-4 p-4">
+        <p className="mb-2 text-center text-lg font-medium">버스를 프레임 안에 위치시키세요</p>
+
+        {/* Current detection status */}
+        {detectedBus && (
+          <div
+            className={`mb-4 rounded-lg p-3 text-center ${isDetectedBusArriving ? 'bg-green-100' : 'bg-gray-100'}`}
+          >
+            <p className="font-medium">인식된 버스: {detectedBus}</p>
+            <p className={isDetectedBusArriving ? 'text-green-600' : 'text-gray-600'}>
+              {isDetectedBusArriving ? '도착 예정 버스입니다!' : '도착 예정 버스가 아닙니다'}
+            </p>
           </div>
-        ) : isAnalyzing ? (
-          <div className="mt-2">
+        )}
+
+        {/* Expected bus arrivals */}
+        <div className="mt-2 mb-4">
+          <p className="mb-2 font-medium">도착 예정 버스:</p>
+          {expectedBuses.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {expectedBuses.map((bus, index) => (
+                <span
+                  key={index}
+                  className="rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-800"
+                >
+                  {bus.busNumber}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500">도착 예정 버스가 없습니다</p>
+          )}
+        </div>
+
+        {isAnalyzing && (
+          <div className="mb-2 text-center">
             <p className="text-sm text-gray-600">분석 중...</p>
           </div>
-        ) : null}
+        )}
 
-        <button
-          onClick={() => setShowImages(true)}
-          className="mt-4 rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
-        >
-          저장된 버스 이미지 보기 ({busImages.length})
-        </button>
+        <div className="flex justify-center">
+          <button
+            onClick={() => setShowImages(true)}
+            className="rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+          >
+            저장된 버스 이미지 보기 ({busImages.length})
+          </button>
+        </div>
       </div>
 
       {showImages && (
