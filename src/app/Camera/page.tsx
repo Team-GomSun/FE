@@ -1,5 +1,6 @@
 'use client';
 
+import locationTracker from '@/hooks/locationTracker';
 import { OCRResponse } from '@/types/ocr';
 import LABELS from '@app-datasets/coco/classes.json';
 import { useQuery } from '@tanstack/react-query';
@@ -38,10 +39,30 @@ export default function Camera() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  const { data: locationStatus } = useQuery({
+    queryKey: ['locationStatus'],
+    queryFn: async () => {
+      if (!locationTracker.isTracking()) {
+        locationTracker.startTracking();
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+
+      try {
+        await getBusArrival();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    refetchInterval: (data) => (data ? false : 2000),
+    enabled: true,
+  });
+
   const { data: expectedBuses = [] } = useQuery<BusInfo[]>({
     queryKey: ['busArrivals'],
     queryFn: getBusArrival,
     refetchInterval: 30000, // 30초
+    enabled: locationStatus === true,
   });
 
   //ai 모델 로딩 함수
