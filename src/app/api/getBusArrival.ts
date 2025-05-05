@@ -23,7 +23,7 @@ export const getBusArrival = async (): Promise<BusInfo[]> => {
   try {
     const response = await apiClient.get(`bus/arrival?userId=${userId}`).json<BusArrivalResponse>();
 
-    if (response.isSuccess && response.code === 200) {
+    if (response.isSuccess) {
       return response.result || [];
     } else {
       console.error(`버스 도착 정보 조회 실패: ${response.message}`);
