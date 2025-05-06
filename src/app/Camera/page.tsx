@@ -542,7 +542,7 @@ export default function Camera() {
 
   return (
     <div className="flex h-screen flex-col bg-white">
-      <div className="relative aspect-[3/4] w-full overflow-hidden">
+      <div className="relative aspect-[3/4] max-h-[60vh] w-full overflow-hidden">
         <Webcam
           audio={false}
           ref={webcamRef}
@@ -575,29 +575,30 @@ export default function Camera() {
       </div>
 
       <div className="mt-4 p-4">
-        <p className="mb-2 text-center text-lg font-medium">버스를 프레임 안에 위치시키세요</p>
+        <p className="mb-4 text-center text-2xl font-bold">
+          버스를 프레임 안에 <br />
+          위치시키세요
+        </p>
 
-        {/* Current detection status */}
         {detectedBus && (
           <div
-            className={`mb-4 rounded-lg p-3 text-center ${isDetectedBusArriving ? 'bg-green-100' : 'bg-gray-100'}`}
+            className={`mb-4 rounded-full p-4 text-center ${
+              isDetectedBusArriving ? 'bg-[#ffde74]' : 'bg-gray-100'
+            }`}
           >
-            <p className="font-medium">인식된 버스: {detectedBus}</p>
-            <p className={isDetectedBusArriving ? 'text-green-600' : 'text-gray-600'}>
-              {isDetectedBusArriving ? '도착 예정 버스입니다!' : '도착 예정 버스가 아닙니다'}
-            </p>
+            <p className="text-7xl font-bold text-[#353535]">{detectedBus}</p>
           </div>
         )}
 
         {/* Expected bus arrivals */}
         <div className="mt-2 mb-4">
-          <p className="mb-2 font-medium">도착 예정 버스:</p>
+          <p className="mb-2 font-medium">도착 예정 버스</p>
           {expectedBuses.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {expectedBuses.map((bus, index) => (
                 <span
                   key={index}
-                  className="rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-800"
+                  className="rounded-full bg-[#FFE285] px-3 py-1 text-sm font-semibold text-[353535]"
                 >
                   {bus.busNumber}
                 </span>
