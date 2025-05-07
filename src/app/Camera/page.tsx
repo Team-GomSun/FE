@@ -27,9 +27,6 @@ export default function Camera() {
   //ai 상태 관리 및 참조 변수
   const modelRef = useRef<tf.GraphModel | null>(null); // useRef로 참조하게 수정
   const [model, setModel] = useState<tf.GraphModel | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [busImages, setBusImages] = useState<string[]>([]);
-  const [showImages, setShowImages] = useState(false);
   const ZOO_MODEL = [{ name: 'yolov5', child: ['yolov5n', 'yolov5s'] }];
   const [modelName] = useState(ZOO_MODEL[0]);
   const [loading, setLoading] = useState(0);
@@ -48,8 +45,11 @@ export default function Camera() {
       }
 
       try {
-        await getBusArrival();
-        return true;
+        if (locationTracker.hasNearbyBusStops()) {
+          await getBusArrival();
+          return true;
+        }
+        return false;
       } catch {
         return false;
       }
@@ -62,7 +62,7 @@ export default function Camera() {
     queryKey: ['busArrivals'],
     queryFn: getBusArrival,
     refetchInterval: 30000, // 30초
-    enabled: locationStatus === true,
+    enabled: locationStatus === true && locationTracker.hasNearbyBusStops(),
   });
 
   //ai 모델 로딩 함수
@@ -171,7 +171,6 @@ export default function Camera() {
       console.log('Model not loaded');
       return;
     }
-    setIsAnalyzing(true);
 
     tf.engine().startScope();
     try {
@@ -234,7 +233,6 @@ export default function Camera() {
       console.error('Error in prediction:', error);
     } finally {
       tf.engine().endScope();
-      setIsAnalyzing(false);
     }
   };
 
@@ -409,11 +407,6 @@ export default function Camera() {
   const saveAndProcessBusImage = async (croppedImage: string) => {
     try {
       // console.log('이미지 처리 시작');
-      // 이미지 저장
-      setBusImages((prev) => {
-        const newImages = [croppedImage, ...prev];
-        return newImages.slice(0, 5);
-      });
 
       // console.log('OCR API 호출');
       const ocrResult = await callOCRAPI(croppedImage);
@@ -552,7 +545,7 @@ export default function Camera() {
 
   return (
     <div className="flex h-screen flex-col bg-white">
-      <div className="relative aspect-[3/4] w-full overflow-hidden">
+      <div className="relative aspect-[3/4] max-h-[60vh] w-full overflow-hidden">
         <Webcam
           audio={false}
           ref={webcamRef}
@@ -585,29 +578,30 @@ export default function Camera() {
       </div>
 
       <div className="mt-4 p-4">
-        <p className="mb-2 text-center text-lg font-medium">버스를 프레임 안에 위치시키세요</p>
+        <p className="mb-4 text-center text-2xl font-bold">
+          버스를 프레임 안에 <br />
+          위치시키세요
+        </p>
 
-        {/* Current detection status */}
         {detectedBus && (
           <div
-            className={`mb-4 rounded-lg p-3 text-center ${isDetectedBusArriving ? 'bg-green-100' : 'bg-gray-100'}`}
+            className={`mb-4 rounded-full p-4 text-center ${
+              isDetectedBusArriving ? 'bg-[#ffde74]' : 'bg-gray-100'
+            }`}
           >
-            <p className="font-medium">인식된 버스: {detectedBus}</p>
-            <p className={isDetectedBusArriving ? 'text-green-600' : 'text-gray-600'}>
-              {isDetectedBusArriving ? '도착 예정 버스입니다!' : '도착 예정 버스가 아닙니다'}
-            </p>
+            <p className="text-7xl font-bold text-[#353535]">{detectedBus}</p>
           </div>
         )}
 
         {/* Expected bus arrivals */}
         <div className="mt-2 mb-4">
-          <p className="mb-2 font-medium">도착 예정 버스:</p>
+          <p className="mb-2 font-medium">도착 예정 버스</p>
           {expectedBuses.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {expectedBuses.map((bus, index) => (
                 <span
                   key={index}
-                  className="rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-800"
+                  className="rounded-full bg-[#FFE285] px-3 py-1 text-sm font-semibold text-[353535]"
                 >
                   {bus.busNumber}
                 </span>
@@ -617,48 +611,7 @@ export default function Camera() {
             <p className="text-gray-500">도착 예정 버스가 없습니다</p>
           )}
         </div>
-
-        {isAnalyzing && (
-          <div className="mb-2 text-center">
-            <p className="text-sm text-gray-600">분석 중...</p>
-          </div>
-        )}
-
-        <div className="flex justify-center">
-          <button
-            onClick={() => setShowImages(true)}
-            className="rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
-          >
-            저장된 버스 이미지 보기 ({busImages.length})
-          </button>
-        </div>
       </div>
-
-      {showImages && (
-        <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
-          <div className="w-full max-w-2xl rounded-lg bg-white p-4">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold">저장된 버스 이미지</h2>
-              <button
-                onClick={() => setShowImages(false)}
-                className="rounded-lg bg-gray-200 px-4 py-2 hover:bg-gray-300"
-              >
-                닫기
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              {busImages.map((image, index) => (
-                <div key={index} className="relative">
-                  <img src={image} alt={`Bus ${index + 1}`} className="w-full rounded-lg" />
-                  <div className="bg-opacity-50 absolute right-0 bottom-0 left-0 bg-black p-2 text-white">
-                    버스 {index + 1}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
