@@ -4,6 +4,11 @@ import { getUserId } from '@/app/api/userUtils';
 class SimpleLocationTracker {
   private intervalId: number | null = null;
   private updateIntervalMs: number = 100000; // 위치 업데이트 주기 (시간)
+  private onNoNearbyBusStops: ((message: string) => void) | null = null;
+
+  public setNoNearbyBusStopsCallback(callback: (message: string) => void): void {
+    this.onNoNearbyBusStops = callback;
+  }
 
   public startTracking(): boolean {
     if (this.intervalId !== null) {
@@ -55,6 +60,12 @@ class SimpleLocationTracker {
             }
           } else {
             console.log('위치 정보가 성공적으로 전송되었습니다.', new Date().toLocaleTimeString());
+          }
+          if (response.code === 20001) {
+            console.log('주변에 버스 정류소가 존재하지 않습니다.');
+            if (this.onNoNearbyBusStops) {
+              this.onNoNearbyBusStops(response.message);
+            }
           }
         } catch (error) {
           console.error('위치 정보 전송 중 오류 발생:', error);
