@@ -57,7 +57,9 @@ export default function ErrorToast({
           className="-mx-1.5 -my-1.5 ml-auto inline-flex h-6 w-6 items-center justify-center rounded-lg bg-red-50 p-1.5 text-red-500 hover:bg-red-100"
           onClick={handleClose}
           aria-label="Close"
-        ></button>
+        >
+          ×
+        </button>
       </div>
     </div>
   );
