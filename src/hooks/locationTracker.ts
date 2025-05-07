@@ -5,9 +5,19 @@ class SimpleLocationTracker {
   private intervalId: number | null = null;
   private updateIntervalMs: number = 100000; // 위치 업데이트 주기 (시간)
   private onNoNearbyBusStops: ((message: string) => void) | null = null;
+  private onNearbyBusStopsFound: (() => void) | null = null;
+  private _nearbyBusStopsExist: boolean = true;
 
   public setNoNearbyBusStopsCallback(callback: (message: string) => void): void {
     this.onNoNearbyBusStops = callback;
+  }
+
+  public setNearbyBusStopsFoundCallback(callback: () => void): void {
+    this.onNearbyBusStopsFound = callback;
+  }
+
+  public hasNearbyBusStops(): boolean {
+    return this._nearbyBusStopsExist;
   }
 
   public startTracking(): boolean {
@@ -48,23 +58,28 @@ class SimpleLocationTracker {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
-
         try {
           const response = await postUserLocation({ latitude, longitude });
-
           if (!response.isSuccess) {
             console.error('위치 정보 전송 실패:', response.message);
-
             if (response.code === 400) {
               this.stopTracking();
             }
           } else {
             console.log('위치 정보가 성공적으로 전송되었습니다.', new Date().toLocaleTimeString());
-          }
-          if (response.code === 20001) {
-            console.log('주변에 버스 정류소가 존재하지 않습니다.');
-            if (this.onNoNearbyBusStops) {
-              this.onNoNearbyBusStops(response.message);
+
+            if (response.code === 20001) {
+              console.log('주변에 버스 정류소가 존재하지 않습니다.');
+              this._nearbyBusStopsExist = false;
+              if (this.onNoNearbyBusStops) {
+                this.onNoNearbyBusStops(response.message);
+              }
+            } else {
+              console.log('주변에 버스 정류장이 존재합니다.');
+              this._nearbyBusStopsExist = true;
+              if (this.onNearbyBusStopsFound) {
+                this.onNearbyBusStopsFound();
+              }
             }
           }
         } catch (error) {

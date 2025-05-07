@@ -45,8 +45,11 @@ export default function Camera() {
       }
 
       try {
-        await getBusArrival();
-        return true;
+        if (locationTracker.hasNearbyBusStops()) {
+          await getBusArrival();
+          return true;
+        }
+        return false;
       } catch {
         return false;
       }
@@ -59,7 +62,7 @@ export default function Camera() {
     queryKey: ['busArrivals'],
     queryFn: getBusArrival,
     refetchInterval: 30000, // 30초
-    enabled: locationStatus === true,
+    enabled: locationStatus === true && locationTracker.hasNearbyBusStops(),
   });
 
   //ai 모델 로딩 함수
