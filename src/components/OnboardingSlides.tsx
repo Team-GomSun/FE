@@ -14,7 +14,7 @@ const slides = [
   {
     img: firstImg,
     alt: '버스 번호를 입력하는 손',
-    text: '버스 번호를 입력하세요 (예: 273)',
+    text: '버스 번호를 입력하세요\n (예: 273)',
   },
   {
     img: secondImg,
@@ -24,17 +24,17 @@ const slides = [
   {
     img: thridImg,
     alt: '핸드폰을 수직으로 들고 있는 손',
-    text: '핸드폰을 수직으로 들어주세요',
+    text: '핸드폰을 수직으로\n 들어주세요',
   },
   {
     img: fourthImg,
     alt: '버스 쪽으로 핸드폰을 향하는 모습',
-    text: '오는 버스 쪽으로 핸드폰을 가져다대세요',
+    text: '오는 버스 쪽으로\n 핸드폰을 가져다대세요',
   },
   {
     img: fifthImg,
     alt: '진동이 오는 핸드폰과 버스에 탑승하는 사람',
-    text: '진동이 오면 해당 버스를 탑승하세요',
+    text: '진동이 오면\n 해당 버스를 탑승하세요',
   },
 ];
 
@@ -80,6 +80,7 @@ export default function OnboardingSlides({ onDone }: OnboardingSlidesProps) {
         <div
           className="font-pretendard mb-8 text-center text-2xl font-bold text-[#353535] md:text-3xl"
           aria-live="polite"
+          style={{ whiteSpace: 'pre-line' }}
         >
           {slides[idx].text}
         </div>
