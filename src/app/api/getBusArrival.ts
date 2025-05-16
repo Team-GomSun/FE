@@ -21,7 +21,9 @@ export const getBusArrival = async (): Promise<BusInfo[]> => {
   }
 
   try {
-    const response = await apiClient.get(`bus/arrival?userId=${userId}`).json<BusArrivalResponse>();
+    const response = await apiClient
+      .get(`bus/arrivals?userId=${userId}`)
+      .json<BusArrivalResponse>();
 
     if (response.isSuccess) {
       return response.result || [];
