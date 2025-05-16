@@ -23,6 +23,7 @@
     "@types/crypto-js": "^4.2.2",
     "@use-funnel/browser": "^0.0.14",
     "crypto-js": "^4.2.0",
+    "framer-motion": "^12.12.1",
     "ky": "^1.8.1",
     "next": "15.3.0",
     "react": "^19.0.0",
