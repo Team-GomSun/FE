@@ -172,9 +172,11 @@ export default function Camera() {
         setWorkerLoading(0.1);
 
         // 워커 생성
-        const worker = await createWorker({
-          langPath: '/model/tessdata',
-        } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+        // const worker = await createWorker({
+        //   langPath: '/model/tessdata',
+        // } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+        const worker = await createWorker('eng+kor');
 
         if (isMounted) {
           workerRef.current = worker;
