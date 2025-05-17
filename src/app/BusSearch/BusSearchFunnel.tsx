@@ -109,6 +109,7 @@ export default function BusSearchFunnel() {
   const renderVoiceInput = ({ history }: { history: any }) => (
     <VoiceInputSection
       onBusNumberDetected={(detectedNumber) => {
+        setBusNumber(detectedNumber);
         history.push('confirmation', () => ({ busNumber: detectedNumber }));
       }}
       onBack={() => {
