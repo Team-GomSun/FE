@@ -13,18 +13,18 @@ export const processOCRResult = async (data: OCRProcessRequest): Promise<OCRProc
       message: '사용자 ID를 찾을 수 없습니다.',
       result: {
         busNumber: '',
-        isMatching: false
-      }
+        isMatching: false,
+      },
     };
   }
-  
+
   try {
     const response = await apiClient
       .post('ocr/process', {
         json: {
           ...data,
-          userId
-        }
+          userId,
+        },
       })
       .json<OCRProcessResponse>();
 
@@ -37,8 +37,8 @@ export const processOCRResult = async (data: OCRProcessRequest): Promise<OCRProc
       message: '서버 통신 중 오류가 발생했습니다.',
       result: {
         busNumber: '',
-        isMatching: false
-      }
+        isMatching: false,
+      },
     };
   }
 };

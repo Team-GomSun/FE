@@ -37,7 +37,7 @@ export default function Camera() {
   const [isDetectedBusArriving, setIsDetectedBusArriving] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
 
-    // Tesseract 워커 관련 상태
+  // Tesseract 워커 관련 상태
   const workerRef = useRef<Tesseract.Worker | null>(null);
   const [workerLoading, setWorkerLoading] = useState(0);
 
@@ -174,8 +174,8 @@ export default function Camera() {
         // 워커 생성
         const worker = await createWorker({
           langPath: '/model/tessdata',
-        } as any);  // eslint-disable-line @typescript-eslint/no-explicit-any
-        
+        } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
         if (isMounted) {
           workerRef.current = worker;
           setWorkerLoading(1);
@@ -500,14 +500,14 @@ export default function Camera() {
 
       const result = await workerRef.current.recognize(croppedImage);
       console.log('Tesseract OCR 결과:', result.data.text);
-      
+
       const busNumber = extractBusNumberFromText(result.data.text);
       const isMatching = busNumber ? checkBusMatch(busNumber) : false;
 
       return {
         busNumber,
         isMatching,
-        rawResult: result
+        rawResult: result,
       };
     } catch (error) {
       console.error('Tesseract 콘솔 처리 중 에러:', error);
@@ -521,13 +521,13 @@ export default function Camera() {
       const ocrResult = await callOCRAPI(croppedImage);
 
       const response = await processOCRResult({
-        ocrResult
+        ocrResult,
       });
 
       return {
         busNumber: response.result.busNumber,
         isMatching: response.result.isMatching,
-        rawResult: ocrResult
+        rawResult: ocrResult,
       };
     } catch (error) {
       console.error('CLOVA OCR + 서버 처리 중 에러:', error);
@@ -545,13 +545,13 @@ export default function Camera() {
       const result = await workerRef.current.recognize(croppedImage);
 
       const response = await processOCRResult({
-        ocrText: result.data.text
+        ocrText: result.data.text,
       });
 
       return {
         busNumber: response.result.busNumber,
         isMatching: response.result.isMatching,
-        rawResult: result
+        rawResult: result,
       };
     } catch (error) {
       console.error('Tesseract + 서버 처리 중 에러:', error);
@@ -616,11 +616,11 @@ export default function Camera() {
   // 4. CLOVA OCR + 서버 처리
   const processBusImage = async (
     croppedImage: string,
-    processorType: OCRProcessorType = OCRProcessorType.CLOVA_OCR
+    processorType: OCRProcessorType = OCRProcessorType.CLOVA_OCR,
   ): Promise<void> => {
     try {
       let result: OCRResult;
-  
+
       switch (processorType) {
         case OCRProcessorType.CLOVA_OCR:
           result = await processWithClovaAndServer(croppedImage);
@@ -642,7 +642,7 @@ export default function Camera() {
       if (result.busNumber) {
         setDetectedBus(result.busNumber);
         setIsDetectedBusArriving(result.isMatching);
-        
+
         if (result.isMatching) {
           setShowNotification(true);
           setTimeout(() => setShowNotification(false), 5000);
