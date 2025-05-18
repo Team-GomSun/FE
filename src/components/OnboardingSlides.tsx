@@ -1,3 +1,4 @@
+'use client';
 import fifthImg from '@/assets/fifth.png';
 import firstImg from '@/assets/first.png';
 import fourthImg from '@/assets/fourth.png';
