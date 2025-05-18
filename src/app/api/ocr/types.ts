@@ -15,7 +15,7 @@ export interface OCRProcessResponse {
 }
 // OCR 처리 방식 enum
 export enum OCRProcessorType {
-  CLOVA_OCR = 'CLOVA_OCR',
+  CLOVA_CONSOLE = 'CLOVA_CONSOLE',
   TESSERACT_CONSOLE = 'TESSERACT_CONSOLE',
   TESSERACT_SERVER = 'TESSERACT_SERVER',
   CLOVA_SERVER = 'CLOVA_SERVER',

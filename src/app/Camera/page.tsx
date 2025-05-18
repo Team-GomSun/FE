@@ -364,7 +364,7 @@ export default function Camera() {
         // 이미지 저장 및 OCR 처리
         // saveAndProcessBusImage(croppedImage);
         // OCR 처리 방식 선택 (예: Tesseract 콘솔 출력)
-        // await processBusImage(croppedImage, OCRProcessorType.CLOVA_OCR);
+        // await processBusImage(croppedImage, OCRProcessorType.CLOVA_CONSOLE);
         // await processBusImage(croppedImage, OCRProcessorType.TESSERACT_SERVER);
         // await processBusImage(croppedImage, OCRProcessorType.CLOVA_SERVER);
         await processBusImage(croppedImage, OCRProcessorType.TESSERACT_CONSOLE);
@@ -618,13 +618,13 @@ export default function Camera() {
   // 4. CLOVA OCR + 서버 처리
   const processBusImage = async (
     croppedImage: string,
-    processorType: OCRProcessorType = OCRProcessorType.CLOVA_OCR,
+    processorType: OCRProcessorType = OCRProcessorType.CLOVA_CONSOLE,
   ): Promise<void> => {
     try {
       let result: OCRResult;
 
       switch (processorType) {
-        case OCRProcessorType.CLOVA_OCR:
+        case OCRProcessorType.CLOVA_SERVER:
           result = await processWithClovaAndServer(croppedImage);
           break;
         case OCRProcessorType.TESSERACT_CONSOLE:
@@ -633,7 +633,7 @@ export default function Camera() {
         case OCRProcessorType.TESSERACT_SERVER:
           result = await processWithTesseractAndServer(croppedImage);
           break;
-        case OCRProcessorType.CLOVA_SERVER:
+        case OCRProcessorType.CLOVA_CONSOLE:
           // 기존 saveAndProcessBusImage 함수 사용
           await saveAndProcessBusImage(croppedImage);
           return;
