@@ -8,6 +8,7 @@
   --color-primary-hover: var(--primary-hover);
   --color-primary-active: var(--primary-active);
   --font-pretendard: var(--font-pretendard, ui-sans-serif, system-ui, sans-serif);
+  --font-blackhansans: var(--font-blackhansans, ui-sans-serif, system-ui, sans-serif);
 }
 
 body {
