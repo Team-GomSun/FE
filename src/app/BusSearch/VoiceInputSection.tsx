@@ -126,7 +126,7 @@ type VoiceInputProps = {
   onBack: () => void;
 };
 
-interface SpeechRecognitionEvent {
+interface LocalSpeechRecognitionEvent {
   results: {
     [key: number]: {
       [key: number]: {
@@ -166,7 +166,7 @@ export const VoiceInputSection = ({ onBusNumberDetected, onBack }: VoiceInputPro
     setIsConfirming(false);
 
     startSpeechRecognition({
-      onResult: (event: SpeechRecognitionEvent) => {
+      onResult: (event: LocalSpeechRecognitionEvent) => {
         const transcript = event.results[0][0].transcript;
         console.log('음성 인식 결과:', transcript);
 
