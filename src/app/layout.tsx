@@ -1,6 +1,7 @@
 import '@/styles/globals.css';
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
+import LogRocketProvider from './LogRocketProvider';
 import Providers from './providers';
 
 const pretendard = localFont({
@@ -30,6 +31,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className={` ${pretendard.variable} ${blackHanSans.variable} antialiased`}>
+        <LogRocketProvider />
         <Providers>{children}</Providers>
       </body>
     </html>
