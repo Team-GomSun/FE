@@ -42,8 +42,6 @@ export default function Camera() {
         console.log('위치 추적 시작...');
         locationTracker.startTracking();
       }
-
-      requestCameraPermission();
     };
 
     initializeApp();
