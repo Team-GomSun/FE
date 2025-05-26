@@ -8,7 +8,7 @@ import * as tf from '@tensorflow/tfjs';
 import '@tensorflow/tfjs-backend-webgl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Webcam from 'react-webcam';
-import { BusInfo, getBusArrival } from '../api/getBusArrival';
+import { BusArrivalResult, getBusArrival } from '../api/getBusArrival';
 
 export default function Camera() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -36,34 +36,62 @@ export default function Camera() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  useEffect(() => {
+    const initializeApp = async () => {
+      if (!locationTracker.isTracking()) {
+        console.log('위치 추적 시작...');
+        locationTracker.startTracking();
+      }
+    };
+
+    initializeApp();
+
+    return () => {
+      if (captureInterval.current) {
+        clearInterval(captureInterval.current);
+      }
+    };
+  }, []);
+
   const { data: locationStatus } = useQuery({
     queryKey: ['locationStatus'],
     queryFn: async () => {
-      if (!locationTracker.isTracking()) {
-        locationTracker.startTracking();
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      }
-
       try {
         if (locationTracker.hasNearbyBusStops()) {
           await getBusArrival();
           return true;
         }
         return false;
-      } catch {
-        return false;
+      } catch (error) {
+        console.log('위치 정보 준비 중...', error);
+        throw error;
       }
     },
-    refetchInterval: (data) => (data ? false : 2000),
+    refetchInterval: (data) => {
+      return data ? false : 3000;
+    },
+    retry: (failureCount) => {
+      return failureCount < 20;
+    },
+    retryDelay: 3000,
     enabled: true,
   });
 
-  const { data: expectedBuses = [] } = useQuery<BusInfo[]>({
+  const { data: busArrivalData } = useQuery<BusArrivalResult>({
     queryKey: ['busArrivals'],
     queryFn: getBusArrival,
-    refetchInterval: 30000, // 30초
+    refetchInterval: 30000,
     enabled: locationStatus === true && locationTracker.hasNearbyBusStops(),
+    retry: (failureCount) => {
+      return failureCount < 10;
+    },
+    retryDelay: 5000,
+    staleTime: 0,
+    gcTime: 0,
   });
+
+  const expectedBuses = busArrivalData?.buses || [];
+  const hasNearbyStops = busArrivalData?.hasNearbyStops ?? false;
 
   //ai 모델 로딩 함수
   useEffect(() => {
@@ -418,10 +446,18 @@ export default function Camera() {
           console.log('버스 번호 인식 성공:', busNumber);
           setDetectedBus(busNumber);
 
-          const isMatching = checkBusMatch(busNumber);
-          setIsDetectedBusArriving(isMatching);
+          // 근처에 정류장이 있는 경우에만 매칭 체크
+          if (hasNearbyStops) {
+            const isMatching = checkBusMatch(busNumber);
+            setIsDetectedBusArriving(isMatching);
 
-          if (isMatching) {
+            if (isMatching) {
+              setShowNotification(true);
+              setTimeout(() => setShowNotification(false), 5000);
+            }
+          } else {
+            // 근처에 정류장이 없을 때는 모든 버스를 도착 예정으로 표시
+            setIsDetectedBusArriving(true);
             setShowNotification(true);
             setTimeout(() => setShowNotification(false), 5000);
           }
@@ -552,8 +588,7 @@ export default function Camera() {
           screenshotFormat="image/jpeg"
           videoConstraints={{
             facingMode: 'environment',
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
+
             aspectRatio: 4 / 3,
           }}
           className="h-full w-full object-cover"
@@ -571,22 +606,21 @@ export default function Camera() {
             className="absolute top-4 right-0 left-0 mx-auto w-4/5 rounded-lg bg-green-500 p-4 text-center text-white shadow-lg"
             style={{ zIndex: 2 }}
           >
-            <p className="text-lg font-bold">도착 예정 버스 발견!</p>
-            <p>{detectedBus} 번 버스가 곧 도착합니다</p>
+            <p className="text-lg font-bold">
+              {hasNearbyStops ? '도착 예정 버스 발견!' : '버스 발견!'}
+            </p>
+            <p>
+              {detectedBus} 번 버스가 {hasNearbyStops ? '곧 도착합니다' : '지나가고 있습니다'}
+            </p>
           </div>
         )}
       </div>
 
       <div className="mt-4 p-4">
-        <p className="mb-4 text-center text-2xl font-bold">
-          버스를 프레임 안에 <br />
-          위치시키세요
-        </p>
-
         {detectedBus && (
           <div
             className={`mb-4 rounded-full p-4 text-center ${
-              isDetectedBusArriving ? 'bg-[#ffde74]' : 'bg-gray-100'
+              isDetectedBusArriving ? 'bg-[#ffd700]' : 'bg-gray-100'
             }`}
           >
             <p className="text-7xl font-bold text-[#353535]">{detectedBus}</p>
@@ -596,19 +630,23 @@ export default function Camera() {
         {/* Expected bus arrivals */}
         <div className="mt-2 mb-4">
           <p className="mb-2 font-medium">도착 예정 버스</p>
-          {expectedBuses.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {expectedBuses.map((bus, index) => (
-                <span
-                  key={index}
-                  className="rounded-full bg-[#FFE285] px-3 py-1 text-sm font-semibold text-[353535]"
-                >
-                  {bus.busNumber}
-                </span>
-              ))}
-            </div>
+          {hasNearbyStops ? (
+            expectedBuses.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {expectedBuses.map((bus, index) => (
+                  <span
+                    key={index}
+                    className="rounded-full bg-[#ffd700] px-3 py-1 text-sm font-semibold text-[#353535]"
+                  >
+                    {bus.busNumber}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500">도착 예정 버스가 없습니다</p>
+            )
           ) : (
-            <p className="text-gray-500">도착 예정 버스가 없습니다</p>
+            <p className="text-orange-500">근처에 버스 정류장이 없습니다</p>
           )}
         </div>
       </div>

@@ -56,14 +56,14 @@ export default function BusSearchFunnel() {
 
       <button
         onClick={() => history.push('numberInput', {} as Record<string, never>)}
-        className="w-full rounded-full bg-[#ffde74] py-3 text-center text-2xl font-bold text-[#353535]"
+        className="w-full rounded-full bg-[#ffd700] py-3 text-center text-2xl font-bold text-[#353535]"
       >
         입력하기
       </button>
 
       <button
         onClick={() => history.push('voiceInput', {} as Record<string, never>)}
-        className="w-full rounded-full bg-[#ffde74] py-3 text-center text-2xl font-bold text-[#353535]"
+        className="w-full rounded-full bg-[#ffd700] py-3 text-center text-2xl font-bold text-[#353535]"
       >
         음성으로 입력하기
       </button>
@@ -86,7 +86,7 @@ export default function BusSearchFunnel() {
         type="text"
         value={busNumber}
         onChange={(e) => setBusNumber(e.target.value)}
-        className="w-full rounded-lg border-2 border-gray-200 px-5 py-3 text-center text-3xl font-semibold text-[#353535] caret-[#ffde74] placeholder:text-gray-400 focus:ring-2 focus:ring-[#ffde74] focus:outline-none"
+        className="w-full rounded-lg border-2 border-gray-200 px-5 py-3 text-center text-3xl font-semibold text-[#353535] caret-[#ffd700] placeholder:text-gray-400 focus:ring-2 focus:ring-[#ffd700] focus:outline-none"
         placeholder="ex) 742"
       />
 
@@ -98,7 +98,7 @@ export default function BusSearchFunnel() {
             history.push('confirmation', () => ({ busNumber }));
           }
         }}
-        className="w-full rounded-full bg-[#ffde74] py-3 text-center text-2xl font-bold text-[#353535]"
+        className="w-full rounded-full bg-[#ffd700] py-3 text-center text-2xl font-bold text-[#353535]"
       >
         다음
       </button>
@@ -129,7 +129,7 @@ export default function BusSearchFunnel() {
         버스 번호를 확인해주세요
       </h2>
 
-      <div className="w-full rounded-lg border-2 border-none bg-[#ffde74] py-5 text-center">
+      <div className="w-full rounded-lg border-2 border-none bg-[#ffd700] py-5 text-center">
         <p className="text-3xl font-semibold text-[#353535]">{context.busNumber}</p>
       </div>
 
@@ -155,7 +155,7 @@ export default function BusSearchFunnel() {
           onClick={() => {
             mutation.mutate({ busNumber: context.busNumber });
           }}
-          className={`flex-1 rounded-lg ${mutation.isPending ? 'bg-gray-300' : 'bg-[#ffde74] hover:bg-yellow-300'} py-3 text-center text-xl font-bold text-[#353535] transition-colors`}
+          className={`flex-1 rounded-lg ${mutation.isPending ? 'bg-gray-300' : 'bg-[#ffd700] hover:bg-yellow-300'} py-3 text-center text-xl font-bold text-[#353535] transition-colors`}
           disabled={mutation.isPending}
         >
           {mutation.isPending ? '처리 중...' : '예'}

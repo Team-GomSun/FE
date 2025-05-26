@@ -266,7 +266,7 @@ export const VoiceInputSection = ({ onBusNumberDetected, onBack }: VoiceInputPro
 
       <div className="flex w-full flex-col items-center justify-center py-4">
         <div id="voice-pulse" className="flex flex-col items-center" style={{ display: 'none' }}>
-          <div className="mb-2 h-16 w-16 animate-pulse rounded-full bg-[#ffde74]"></div>
+          <div className="mb-2 h-16 w-16 animate-pulse rounded-full bg-[#ffd700]"></div>
         </div>
 
         <p id="voice-status" className="text-lg text-gray-500">
@@ -277,7 +277,7 @@ export const VoiceInputSection = ({ onBusNumberDetected, onBack }: VoiceInputPro
 
         <div
           id="voice-result-container"
-          className="bg-opacity-50 mt-4 w-full rounded-lg bg-[#ffde74] p-4 text-center"
+          className="bg-opacity-50 mt-4 w-full rounded-lg bg-[#ffd700] p-4 text-center"
           style={{ display: 'none' }}
         >
           <p id="voice-transcript" className="text-xl font-semibold text-[#353535]"></p>
@@ -289,7 +289,7 @@ export const VoiceInputSection = ({ onBusNumberDetected, onBack }: VoiceInputPro
             <div className="mt-4 flex justify-center space-x-4">
               <button
                 onClick={handleRestart}
-                className="rounded-lg bg-[#ffde74] px-4 py-2 text-sm font-bold text-[#353535] transition-colors hover:bg-yellow-300"
+                className="rounded-lg bg-[#ffd700] px-4 py-2 text-sm font-bold text-[#353535] transition-colors hover:bg-[#ffd700]"
               >
                 다시 말하기
               </button>
@@ -309,7 +309,7 @@ export const VoiceInputSection = ({ onBusNumberDetected, onBack }: VoiceInputPro
         {!isConfirming && (
           <button
             onClick={handleRestart}
-            className="flex-1 rounded-lg bg-[#ffde74] py-3 text-center text-xl font-bold text-[#353535] transition-colors hover:bg-yellow-300"
+            className="flex-1 rounded-lg bg-[#ffd700] py-3 text-center text-xl font-bold text-[#353535] transition-colors hover:bg-[#FFD700]"
           >
             다시 말하기
           </button>
