@@ -636,7 +636,7 @@ export default function Camera() {
                 {expectedBuses.map((bus, index) => (
                   <span
                     key={index}
-                    className="rounded-full bg-[#ffd700] px-3 py-1 text-sm font-semibold text-[353535]"
+                    className="rounded-full bg-[#ffd700] px-3 py-1 text-sm font-semibold text-[#353535]"
                   >
                     {bus.busNumber}
                   </span>
