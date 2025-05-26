@@ -586,7 +586,7 @@ export default function Camera() {
         {detectedBus && (
           <div
             className={`mb-4 rounded-full p-4 text-center ${
-              isDetectedBusArriving ? 'bg-[#ffde74]' : 'bg-gray-100'
+              isDetectedBusArriving ? 'bg-[#ffd700]' : 'bg-gray-100'
             }`}
           >
             <p className="text-7xl font-bold text-[#353535]">{detectedBus}</p>
@@ -601,7 +601,7 @@ export default function Camera() {
               {expectedBuses.map((bus, index) => (
                 <span
                   key={index}
-                  className="rounded-full bg-[#FFE285] px-3 py-1 text-sm font-semibold text-[353535]"
+                  className="rounded-full bg-[#ffd700] px-3 py-1 text-sm font-semibold text-[353535]"
                 >
                   {bus.busNumber}
                 </span>
