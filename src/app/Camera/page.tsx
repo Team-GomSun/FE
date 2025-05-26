@@ -36,33 +36,60 @@ export default function Camera() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  useEffect(() => {
+    const initializeApp = async () => {
+      if (!locationTracker.isTracking()) {
+        console.log('위치 추적 시작...');
+        locationTracker.startTracking();
+      }
+
+      requestCameraPermission();
+    };
+
+    initializeApp();
+
+    return () => {
+      if (captureInterval.current) {
+        clearInterval(captureInterval.current);
+      }
+    };
+  }, []);
+
   const { data: locationStatus } = useQuery({
     queryKey: ['locationStatus'],
     queryFn: async () => {
-      if (!locationTracker.isTracking()) {
-        locationTracker.startTracking();
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      }
-
       try {
         if (locationTracker.hasNearbyBusStops()) {
           await getBusArrival();
           return true;
         }
         return false;
-      } catch {
-        return false;
+      } catch (error) {
+        console.log('위치 정보 준비 중...', error);
+        throw error;
       }
     },
-    refetchInterval: (data) => (data ? false : 2000),
+    refetchInterval: (data) => {
+      return data ? false : 3000;
+    },
+    retry: (failureCount) => {
+      return failureCount < 20;
+    },
+    retryDelay: 3000,
     enabled: true,
   });
 
   const { data: busArrivalData } = useQuery<BusArrivalResult>({
     queryKey: ['busArrivals'],
     queryFn: getBusArrival,
-    refetchInterval: 30000, // 30초
+    refetchInterval: 30000,
     enabled: locationStatus === true && locationTracker.hasNearbyBusStops(),
+    retry: (failureCount) => {
+      return failureCount < 10;
+    },
+    retryDelay: 5000,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   const expectedBuses = busArrivalData?.buses || [];

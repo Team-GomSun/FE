@@ -41,12 +41,14 @@ export const getBusArrival = async (): Promise<BusArrivalResult> => {
         buses: [],
         hasNearbyStops: false,
       };
+    } else if (response.code === 40403) {
+      throw new Error('위치 정보 준비 중...');
     } else {
       console.error(`버스 도착 정보 조회 실패: ${response.message}`);
       return { buses: [], hasNearbyStops: false };
     }
   } catch (error) {
     console.error('버스 도착 정보 조회 중 오류 발생:', error);
-    return { buses: [], hasNearbyStops: false };
+    throw error;
   }
 };
