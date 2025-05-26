@@ -578,11 +578,6 @@ export default function Camera() {
       </div>
 
       <div className="mt-4 p-4">
-        <p className="mb-4 text-center text-2xl font-bold">
-          버스를 프레임 안에 <br />
-          위치시키세요
-        </p>
-
         {detectedBus && (
           <div
             className={`mb-4 rounded-full p-4 text-center ${
