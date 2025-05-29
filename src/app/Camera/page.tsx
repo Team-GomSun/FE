@@ -9,6 +9,7 @@ import '@tensorflow/tfjs-backend-webgl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Webcam from 'react-webcam';
 import { BusArrivalResult, getBusArrival } from '../api/getBusArrival';
+import { getBusNumber } from '../api/userUtils';
 
 export default function Camera() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -81,17 +82,27 @@ export default function Camera() {
     queryKey: ['busArrivals'],
     queryFn: getBusArrival,
     refetchInterval: 30000,
-    enabled: locationStatus === true && locationTracker.hasNearbyBusStops(),
+    enabled: true,
     retry: (failureCount) => {
       return failureCount < 10;
     },
-    retryDelay: 5000,
+    retryDelay: 1000,
     staleTime: 0,
     gcTime: 0,
   });
 
   const expectedBuses = busArrivalData?.buses || [];
   const hasNearbyStops = busArrivalData?.hasNearbyStops ?? false;
+  const isRegisteredBusArriving = busArrivalData?.isRegisteredBusArriving ?? false;
+
+  console.log('🔄 Query 상태:', {
+    locationStatus,
+    hasNearbyBusStops: locationTracker.hasNearbyBusStops(),
+    busArrivalData,
+    expectedBuses,
+    hasNearbyStops,
+    isRegisteredBusArriving,
+  });
 
   //ai 모델 로딩 함수
   useEffect(() => {
@@ -413,56 +424,104 @@ export default function Camera() {
     }
   };
 
-  const checkBusMatch = (busNumber: string) => {
-    if (!busNumber || !expectedBuses || expectedBuses.length === 0) {
+  // 진짜 3박자 매칭 함수 - OCR + API배열 + 입력한버스번호
+  const checkBusMatch = (detectedBusNumber: string) => {
+    console.log('=== 3박자 버스 매칭 체크 시작 ===');
+    console.log(`OCR 감지된 버스: "${detectedBusNumber}"`);
+
+    // 조건 1: 사용자가 입력해둔 버스 번호가 있어야 함
+    const userInputBusNumber = getBusNumber();
+    console.log(`사용자 입력 버스 번호: "${userInputBusNumber}"`);
+
+    if (!userInputBusNumber) {
+      console.log('❌ 사용자가 입력한 버스 번호가 없습니다');
       return false;
     }
 
-    for (let i = 0; i < expectedBuses.length; i++) {
-      const bus = expectedBuses[i];
+    // 조건 2: isRegisteredBusArriving이 true여야 함 (등록한 버스가 실제 도착 예정)
+    console.log(`등록 버스 도착 예정 상태: ${isRegisteredBusArriving}`);
 
-      if (!bus || !bus.busNumber) continue;
-
-      if (String(bus.busNumber) === String(busNumber)) {
-        return true;
-      }
+    if (!isRegisteredBusArriving) {
+      console.log('❌ 등록한 버스가 현재 도착 예정이 아닙니다');
+      return false;
     }
 
-    return false;
+    // 조건 3: API에서 받은 도착 예정 버스 배열에 해당 버스가 있어야 함
+    console.log(`API 도착 예정 버스 목록:`, expectedBuses);
+
+    if (!expectedBuses || expectedBuses.length === 0) {
+      console.log('❌ API 도착 예정 버스 목록이 비어있습니다');
+      return false;
+    }
+
+    const detectedStr = String(detectedBusNumber).trim();
+    const userInputStr = String(userInputBusNumber).trim();
+
+    // 조건 4: OCR 결과 === 사용자 입력 버스 번호
+    console.log(`OCR "${detectedStr}" vs 사용자입력 "${userInputStr}"`);
+
+    if (detectedStr !== userInputStr) {
+      console.log(`❌ OCR 결과(${detectedStr})와 사용자 입력(${userInputStr})이 다릅니다`);
+      return false;
+    }
+
+    // 조건 5: API 배열에도 해당 버스가 있어야 함
+    const isInApiList = expectedBuses.some((bus) => String(bus.busNumber).trim() === detectedStr);
+
+    console.log(`API 배열에 ${detectedStr} 존재 여부: ${isInApiList}`);
+
+    if (!isInApiList) {
+      console.log(`❌ API 배열에 ${detectedStr}번 버스가 없습니다`);
+      console.log(`API 배열 버스들: [${expectedBuses.map((b) => b.busNumber).join(', ')}]`);
+      return false;
+    }
+
+    console.log(`🎉🎉🎉 3박자 모두 일치! 완벽한 매칭!`);
+    console.log(`✅ OCR 감지: "${detectedStr}"`);
+    console.log(`✅ 사용자 입력: "${userInputStr}"`);
+    console.log(`✅ API 배열에 존재: ${isInApiList}`);
+    console.log(`✅ 등록 버스 도착 예정: ${isRegisteredBusArriving}`);
+    console.log('=== 3박자 매칭 완료 ===');
+    return true;
   };
 
-  // 버스 이미지 저장 및 OCR 처리
+  // 수정된 버스 이미지 저장 및 OCR 처리
   const saveAndProcessBusImage = async (croppedImage: string) => {
     try {
-      // console.log('이미지 처리 시작');
-
-      // console.log('OCR API 호출');
+      console.log('🖼️ 이미지 처리 시작');
       const ocrResult = await callOCRAPI(croppedImage);
 
       if (ocrResult) {
-        // console.log('OCR 결과 처리');
         const busNumber = extractBusNumber(ocrResult);
         if (busNumber) {
-          console.log('버스 번호 인식 성공:', busNumber);
+          console.log('🎯 버스 번호 인식 성공:', busNumber);
           setDetectedBus(busNumber);
+
+          console.log('🏠 hasNearbyStops 체크:', hasNearbyStops);
+          console.log('🚌 expectedBuses:', expectedBuses);
+          console.log('✅ isRegisteredBusArriving:', isRegisteredBusArriving);
+          console.log('📊 전체 busArrivalData:', busArrivalData);
 
           // 근처에 정류장이 있는 경우에만 매칭 체크
           if (hasNearbyStops) {
+            console.log('✅ 정류장이 있음 - 매칭 함수 호출');
+            // 3박자 모두 체크하는 함수 호출
             const isMatching = checkBusMatch(busNumber);
+            console.log(`🔍 매칭 결과: ${isMatching}`);
             setIsDetectedBusArriving(isMatching);
 
             if (isMatching) {
+              console.log('🎉 알림 표시!');
               setShowNotification(true);
               setTimeout(() => setShowNotification(false), 5000);
             }
           } else {
-            // 근처에 정류장이 없을 때는 모든 버스를 도착 예정으로 표시
-            setIsDetectedBusArriving(true);
-            setShowNotification(true);
-            setTimeout(() => setShowNotification(false), 5000);
+            // 근처에 정류장이 없으면 매칭하지 않음
+            console.log('❌ 근처에 정류장이 없어 매칭하지 않습니다');
+            setIsDetectedBusArriving(false);
           }
         } else {
-          console.log('버스 번호를 찾을 수 없음', ocrResult.images[0].fields);
+          console.log('❌ 버스 번호를 찾을 수 없음', ocrResult.images[0].fields);
         }
       }
     } catch (error) {
@@ -588,7 +647,6 @@ export default function Camera() {
           screenshotFormat="image/jpeg"
           videoConstraints={{
             facingMode: 'environment',
-
             aspectRatio: 4 / 3,
           }}
           className="h-full w-full object-cover"
@@ -600,18 +658,14 @@ export default function Camera() {
           style={{ zIndex: 1 }}
         />
 
-        {/* Bus Arrival Notification */}
+        {/* 수정된 Bus Arrival Notification */}
         {showNotification && (
           <div
             className="absolute top-4 right-0 left-0 mx-auto w-4/5 rounded-lg bg-green-500 p-4 text-center text-white shadow-lg"
             style={{ zIndex: 2 }}
           >
-            <p className="text-lg font-bold">
-              {hasNearbyStops ? '도착 예정 버스 발견!' : '버스 발견!'}
-            </p>
-            <p>
-              {detectedBus} 번 버스가 {hasNearbyStops ? '곧 도착합니다' : '지나가고 있습니다'}
-            </p>
+            <p className="text-lg font-bold">등록한 버스가 도착했습니다!</p>
+            <p>{detectedBus}번 버스가 곧 도착합니다</p>
           </div>
         )}
       </div>
@@ -632,15 +686,24 @@ export default function Camera() {
           <p className="mb-2 font-medium">도착 예정 버스</p>
           {hasNearbyStops ? (
             expectedBuses.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {expectedBuses.map((bus, index) => (
-                  <span
-                    key={index}
-                    className="rounded-full bg-[#ffd700] px-3 py-1 text-sm font-semibold text-[#353535]"
-                  >
-                    {bus.busNumber}
-                  </span>
-                ))}
+              <div>
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {expectedBuses.map((bus, index) => (
+                    <span
+                      key={index}
+                      className="rounded-full bg-[#ffd700] px-3 py-1 text-sm font-semibold text-[#353535]"
+                    >
+                      {bus.busNumber}
+                    </span>
+                  ))}
+                </div>
+                {isRegisteredBusArriving ? (
+                  <p className="text-sm font-medium text-green-600">
+                    ✅ 등록한 버스가 도착 예정입니다!
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-500">등록한 버스는 현재 도착 예정이 아닙니다</p>
+                )}
               </div>
             ) : (
               <p className="text-gray-500">도착 예정 버스가 없습니다</p>
@@ -648,6 +711,16 @@ export default function Camera() {
           ) : (
             <p className="text-orange-500">근처에 버스 정류장이 없습니다</p>
           )}
+        </div>
+
+        {/* 디버깅용 정보 표시 (개발 중에만 사용) */}
+        <div className="mt-4 rounded bg-gray-100 p-2 text-xs text-gray-600">
+          <p>📱 OCR 감지 버스: {detectedBus || '없음'}</p>
+          <p>👤 사용자 입력 버스: {getBusNumber() || '없음'}</p>
+          <p>🚌 API 도착예정 버스: {expectedBuses.map((b) => b.busNumber).join(', ') || '없음'}</p>
+          <p>🏠 근처 정류장: {hasNearbyStops ? '있음' : '없음'}</p>
+          <p>✅ 등록 버스 도착 예정: {isRegisteredBusArriving ? '예' : '아니오'}</p>
+          <p>🎯 최종 매칭: {isDetectedBusArriving ? '성공' : '실패'}</p>
         </div>
       </div>
     </div>

@@ -15,11 +15,11 @@ export interface BusArrivalResponse {
 export interface BusArrivalResult {
   buses: BusInfo[];
   hasNearbyStops: boolean;
+  isRegisteredBusArriving?: boolean;
 }
 
 export const getBusArrival = async (): Promise<BusArrivalResult> => {
   const userId = getUserId();
-
   if (!userId) {
     console.error('사용자 ID를 찾을 수 없습니다.');
     return { buses: [], hasNearbyStops: false };
@@ -31,16 +31,19 @@ export const getBusArrival = async (): Promise<BusArrivalResult> => {
       .json<BusArrivalResponse>();
 
     if (response.isSuccess) {
-      return {
-        buses: response.result || [],
-        hasNearbyStops: true,
-      };
-    } else if (response.code === 20002) {
-      console.log('근처에 버스 정류장이 없습니다.');
-      return {
-        buses: [],
-        hasNearbyStops: false,
-      };
+      if (response.code === 20002) {
+        return {
+          buses: response.result || [],
+          hasNearbyStops: true,
+          isRegisteredBusArriving: true,
+        };
+      } else {
+        return {
+          buses: response.result || [],
+          hasNearbyStops: true,
+          isRegisteredBusArriving: false,
+        };
+      }
     } else if (response.code === 40403) {
       throw new Error('위치 정보 준비 중...');
     } else {
