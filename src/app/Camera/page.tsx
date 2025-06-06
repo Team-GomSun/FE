@@ -8,7 +8,10 @@ import * as tf from '@tensorflow/tfjs';
 import '@tensorflow/tfjs-backend-webgl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Webcam from 'react-webcam';
+import { createWorker } from 'tesseract.js';
 import { BusArrivalResult, getBusArrival } from '../api/getBusArrival';
+import { processOCRResult } from '../api/ocr/process';
+import { OCRProcessorType, OCRResult } from '../api/ocr/types';
 import { getBusNumber } from '../api/userUtils';
 
 export default function Camera() {
@@ -34,6 +37,10 @@ export default function Camera() {
   const [detectedBus, setDetectedBus] = useState<string | null>(null);
   const [isDetectedBusArriving, setIsDetectedBusArriving] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
+
+  // Tesseract 워커 관련 상태
+  const workerRef = useRef<Tesseract.Worker | null>(null);
+  const [workerLoading, setWorkerLoading] = useState(0);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -104,7 +111,7 @@ export default function Camera() {
     isRegisteredBusArriving,
   });
 
-  //ai 모델 로딩 함수
+  //ai 객체인식 모델 로딩 함수 [YOLOv5 사용]
   useEffect(() => {
     let isMounted = true;
     let loadedModel: tf.GraphModel | null = null;
@@ -193,6 +200,47 @@ export default function Camera() {
       }
     };
   }, [modelName]);
+
+  // Tesseract 워커 로드 useEffect (OCR)
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadWorker = async () => {
+      try {
+        console.log('Starting Tesseract worker load...');
+        setWorkerLoading(0.1);
+
+        // 워커 생성
+        // const worker = await createWorker({
+        //   langPath: '/model/tessdata',
+        // } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+        const worker = await createWorker('eng+kor');
+
+        if (isMounted) {
+          workerRef.current = worker;
+          setWorkerLoading(1);
+          console.log('Tesseract worker ready');
+        }
+      } catch (error) {
+        console.error('Error loading Tesseract worker:', error);
+        if (isMounted) {
+          workerRef.current = null;
+          setWorkerLoading(0);
+        }
+      }
+    };
+
+    loadWorker();
+
+    return () => {
+      isMounted = false;
+      if (workerRef.current) {
+        console.log('Cleaning up Tesseract worker...');
+        workerRef.current.terminate();
+      }
+    };
+  }, []);
 
   // 여기에서 이미지를 처리하면 될 것 같아요
   const sendImageToServer = async (imageData: string) => {
@@ -353,7 +401,12 @@ export default function Camera() {
         const croppedImage = cropCanvas.toDataURL('image/jpeg');
 
         // 이미지 저장 및 OCR 처리
-        saveAndProcessBusImage(croppedImage);
+        // saveAndProcessBusImage(croppedImage);
+        // OCR 처리 방식 선택 (예: Tesseract 콘솔 출력)
+        // await processBusImage(croppedImage, OCRProcessorType.CLOVA_OCR);
+        // await processBusImage(croppedImage, OCRProcessorType.TESSERACT_SERVER);
+        // await processBusImage(croppedImage, OCRProcessorType.CLOVA_SERVER);
+        await processBusImage(croppedImage, OCRProcessorType.TESSERACT_CONSOLE);
       }
     }
   };
@@ -485,7 +538,7 @@ export default function Camera() {
     return true;
   };
 
-  // 수정된 버스 이미지 저장 및 OCR 처리
+  // 버스 이미지 저장 및 OCR 처리
   const saveAndProcessBusImage = async (croppedImage: string) => {
     try {
       console.log('🖼️ 이미지 처리 시작');
@@ -535,6 +588,74 @@ export default function Camera() {
     }
   };
 
+  // 2. Tesseract OCR + 클라이언트 처리
+  const processWithTesseractConsole = async (croppedImage: string): Promise<OCRResult> => {
+    try {
+      if (!workerRef.current) {
+        throw new Error('Tesseract worker not loaded');
+      }
+
+      const result = await workerRef.current.recognize(croppedImage);
+      console.log('Tesseract OCR 결과:', result.data.text);
+
+      const busNumber = extractBusNumberFromText(result.data.text);
+      const isMatching = busNumber ? checkBusMatch(busNumber) : false;
+
+      return {
+        busNumber,
+        isMatching,
+        rawResult: result,
+      };
+    } catch (error) {
+      console.error('Tesseract 콘솔 처리 중 에러:', error);
+      return { busNumber: null, isMatching: false };
+    }
+  };
+
+  // 3. CLOVA OCR + 서버 전송
+  const processWithClovaAndServer = async (croppedImage: string): Promise<OCRResult> => {
+    try {
+      const ocrResult = await callOCRAPI(croppedImage);
+
+      const response = await processOCRResult({
+        ocrResult,
+      });
+
+      return {
+        busNumber: response.result.busNumber,
+        isMatching: response.result.isMatching,
+        rawResult: ocrResult,
+      };
+    } catch (error) {
+      console.error('CLOVA OCR + 서버 처리 중 에러:', error);
+      return { busNumber: null, isMatching: false };
+    }
+  };
+
+  // 4. Tesseract + 서버 전송
+  const processWithTesseractAndServer = async (croppedImage: string): Promise<OCRResult> => {
+    try {
+      if (!workerRef.current) {
+        throw new Error('Tesseract worker not loaded');
+      }
+
+      const result = await workerRef.current.recognize(croppedImage);
+
+      const response = await processOCRResult({
+        ocrText: result.data.text,
+      });
+
+      return {
+        busNumber: response.result.busNumber,
+        isMatching: response.result.isMatching,
+        rawResult: result,
+      };
+    } catch (error) {
+      console.error('Tesseract + 서버 처리 중 에러:', error);
+      return { busNumber: null, isMatching: false };
+    }
+  };
+
   // 버스 번호 추출 함수
   const extractBusNumber = (ocrResult: OCRResponse): string | null => {
     try {
@@ -562,6 +683,70 @@ export default function Camera() {
     } catch (error) {
       console.error('버스 번호 추출 중 에러:', error);
       return null;
+    }
+  };
+
+  // 버스 번호 추출 헬퍼 함수 (텍스트용)
+  const extractBusNumberFromText = (text: string): string | null => {
+    const busNumberPatterns = [
+      /^\d{1,4}[-\s]?\d{1,4}$/,
+      /^[가-힣]\d{1,4}$/,
+      /^[A-Z]\d{1,4}$/,
+      /^[가-힣]\d{1,4}[-\s]?\d{1,4}$/,
+    ];
+
+    const words = text.split(/\s+/);
+    for (const word of words) {
+      for (const pattern of busNumberPatterns) {
+        if (pattern.test(word)) {
+          return word;
+        }
+      }
+    }
+    return null;
+  };
+
+  // OCR 처리 함수 선택기
+  // 1. CLOVA OCR + 클라이언트 처리
+  // 2. Tesseract + 클라이언트 처리
+  // 3. Tesseract + 서버 처리
+  // 4. CLOVA OCR + 서버 처리
+  const processBusImage = async (
+    croppedImage: string,
+    processorType: OCRProcessorType = OCRProcessorType.CLOVA_OCR,
+  ): Promise<void> => {
+    try {
+      let result: OCRResult;
+
+      switch (processorType) {
+        case OCRProcessorType.CLOVA_OCR:
+          result = await processWithClovaAndServer(croppedImage);
+          break;
+        case OCRProcessorType.TESSERACT_CONSOLE:
+          result = await processWithTesseractConsole(croppedImage);
+          break;
+        case OCRProcessorType.TESSERACT_SERVER:
+          result = await processWithTesseractAndServer(croppedImage);
+          break;
+        case OCRProcessorType.CLOVA_SERVER:
+          // 기존 saveAndProcessBusImage 함수 사용
+          await saveAndProcessBusImage(croppedImage);
+          return;
+        default:
+          throw new Error('지원하지 않는 OCR 처리 방식입니다.');
+      }
+
+      if (result.busNumber) {
+        setDetectedBus(result.busNumber);
+        setIsDetectedBusArriving(result.isMatching);
+
+        if (result.isMatching) {
+          setShowNotification(true);
+          setTimeout(() => setShowNotification(false), 5000);
+        }
+      }
+    } catch (error) {
+      console.error('OCR 처리 중 에러:', error);
     }
   };
 
@@ -598,7 +783,7 @@ export default function Camera() {
   }, [hasPermission, continuousCapture]);
 
   // 모델 로딩 상태에 따른 UI 처리
-  if (loading < 1) {
+  if (loading < 1 || workerLoading < 1) {
     return (
       <div className="flex h-screen flex-col items-center justify-center">
         <div className="text-center">
@@ -608,8 +793,13 @@ export default function Camera() {
               className="h-2 rounded-full bg-blue-500 transition-all duration-300"
               style={{ width: `${loading * 100}%` }}
             />
+            <div
+              className="h-2 rounded-full bg-blue-500 transition-all duration-300"
+              style={{ width: `${workerLoading * 100}%` }}
+            />
           </div>
           <p className="mt-2 text-sm text-gray-600">{Math.round(loading * 100)}%</p>
+          <p className="mt-2 text-sm text-gray-600">{Math.round(workerLoading * 100)}%</p>
         </div>
       </div>
     );
