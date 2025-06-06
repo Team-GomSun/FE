@@ -14,6 +14,8 @@ export const processOCRResult = async (data: OCRProcessRequest): Promise<OCRProc
       result: {
         busNumber: '',
         isMatching: false,
+        matchType: '',
+        processedBusNumber: '',
       },
     };
   }
@@ -38,6 +40,8 @@ export const processOCRResult = async (data: OCRProcessRequest): Promise<OCRProc
       result: {
         busNumber: '',
         isMatching: false,
+        matchType: '',
+        processedBusNumber: '',
       },
     };
   }

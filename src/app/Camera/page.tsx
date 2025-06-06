@@ -406,7 +406,7 @@ export default function Camera() {
         // await processBusImage(croppedImage, OCRProcessorType.CLOVA_OCR);
         // await processBusImage(croppedImage, OCRProcessorType.TESSERACT_SERVER);
         // await processBusImage(croppedImage, OCRProcessorType.CLOVA_SERVER);
-        await processBusImage(croppedImage, OCRProcessorType.TESSERACT_CONSOLE);
+        await processBusImage(croppedImage, OCRProcessorType.CLOVA_OCR);
       }
     }
   };
@@ -613,17 +613,36 @@ export default function Camera() {
   };
 
   // 3. CLOVA OCR + 서버 전송
+  // 3. CLOVA OCR + 서버 전송 (수정됨)
   const processWithClovaAndServer = async (croppedImage: string): Promise<OCRResult> => {
     try {
       const ocrResult = await callOCRAPI(croppedImage);
+      const extractedBusNumber = extractBusNumber(ocrResult);
 
+      if (!extractedBusNumber) {
+        return { busNumber: null, isMatching: false };
+      }
+
+      console.log('추출된 버스 번호:', extractedBusNumber);
+      setDetectedBus(extractedBusNumber);
+
+      // 서버로 전송
       const response = await processOCRResult({
-        ocrResult,
+        ocrText: extractedBusNumber,
       });
 
+      console.log('서버 응답:', response);
+
+      // 서버에서 matchType이 "EXACT"인 경우 매칭 성공
+      const isMatching = response.result.matchType === 'EXACT';
+
+      console.log(
+        `서버 매칭 결과: matchType=${response.result.matchType}, isMatching=${isMatching}`,
+      );
+
       return {
-        busNumber: response.result.busNumber,
-        isMatching: response.result.isMatching,
+        busNumber: response.result.processedBusNumber || extractedBusNumber,
+        isMatching: isMatching,
         rawResult: ocrResult,
       };
     } catch (error) {
