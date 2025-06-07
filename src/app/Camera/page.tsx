@@ -219,7 +219,7 @@ export default function Camera() {
         setSsdLoading(0.1);
 
         const model = await cocoSsd.load({
-          base: 'mobilenet_v2'
+          base: 'mobilenet_v2',
         });
         setSsdLoading(0.5);
 
@@ -257,12 +257,12 @@ export default function Camera() {
       // yolov5n 모델 사용
       // doPredictFrame(imageData);
       // mobilenet ssd 모델 사용
-      doPredictFrame2(imageData); 
+      doPredictFrame2(imageData);
     }
   };
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const doPredictFrame = async (imageData: string) => { // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const doPredictFrame = async (imageData: string) => {
     // ref에서 먼저 모델을 확인하고, 없으면 state에서 확인
     const modelToUse = modelRef.current || model;
 
@@ -329,7 +329,7 @@ export default function Camera() {
     }
   };
 
-  const renderPrediction = async ( 
+  const renderPrediction = async (
     boxesData: number[],
     scoresData: number[],
     classesData: number[],
@@ -409,13 +409,13 @@ export default function Camera() {
             cropCanvas.height = height;
             const cropCtx = cropCanvas.getContext('2d');
             if (!cropCtx) return resolve();
-  
+
             // Convert to data URL
             cropCtx.drawImage(frameImg, x1, y1, width, height, 0, 0, width, height);
 
             // Convert to data URL
             const croppedImage = cropCanvas.toDataURL('image/jpeg');
-  
+
             // 이미지 저장 및 OCR 처리
             // saveAndProcessBusImage(croppedImage);
             // OCR 처리 방식 선택 (예: Tesseract 콘솔 출력)
@@ -433,28 +433,27 @@ export default function Camera() {
     await Promise.all(processBusPromises);
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const doPredictFrame2 = async (imageData: string) => {
     // ref에서 먼저 모델을 확인하고, 없으면 state에서 확인
     const modelToUse = modelRef.current || model;
     const ssdModelToUse = ssdModelRef.current || ssdModel;
-  
+
     if (!modelToUse || !ssdModelToUse) {
       console.log('Models not loaded', {
         yolo: !!modelToUse,
         ssd: !!ssdModelToUse,
         ssdRef: !!ssdModelRef.current,
-        ssdState: !!ssdModel
+        ssdState: !!ssdModel,
       });
       return;
     }
-  
+
     tf.engine().startScope();
     try {
       // Create a temporary image element to load the screenshot
       const img = new Image();
       img.src = imageData;
-  
+
       await new Promise((resolve, reject) => {
         img.onload = () => {
           // 이미지 로드 완료 후 캔버스 크기 설정
@@ -466,137 +465,132 @@ export default function Camera() {
         };
         img.onerror = reject;
       });
-  
+
       // MobileNet SSD 모델 사용
       console.log('Running SSD prediction...');
       const predictions = await ssdModelToUse.detect(img);
-  
+
       // SSD 예측 결과를 처리
       const boxesData: number[] = [];
       const scoresData: number[] = [];
       const classesData: number[] = [];
-  
+
       predictions.forEach((prediction) => {
         // prediction.bbox 형식 확인 및 정규화
         const [x, y, width, height] = prediction.bbox;
-        
-        // bbox가 절대 좌표인 경우 정규화 
+
+        // bbox가 절대 좌표인 경우 정규화
         const normalizedX1 = x / img.width;
         const normalizedY1 = y / img.height;
         const normalizedX2 = (x + width) / img.width;
         const normalizedY2 = (y + height) / img.height;
-        
-        
+
         boxesData.push(normalizedX1, normalizedY1, normalizedX2, normalizedY2);
         scoresData.push(prediction.score);
-        
+
         // COCO 클래스 ID 매핑
         const classId = prediction.class === 'bus' ? 5 : -1;
         classesData.push(classId);
-        
       });
-  
+
       // 변환된 데이터로 예측 결과 렌더링
       await renderPrediction2(boxesData, scoresData, classesData, img);
-  
     } catch (error) {
       console.error('Error in prediction:', error);
     } finally {
       tf.engine().endScope();
     }
   };
-  
+
   const renderPrediction2 = async (
     boxesData: number[],
     scoresData: number[],
     classesData: number[],
-    sourceImg: HTMLImageElement // 추가: 원본 이미지 참조
+    sourceImg: HTMLImageElement, // 추가: 원본 이미지 참조
   ) => {
     if (!canvasRef.current) {
       console.log('Canvas ref not available');
       return;
     }
-  
+
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) {
       console.log('Canvas context not available');
       return;
     }
-  
-  
+
     // clean canvas
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  
+
     const font = '16px sans-serif';
     ctx.font = font;
     ctx.textBaseline = 'top';
-  
+
     const processBusPromises: Promise<void>[] = [];
     let busProcessed = 0;
-  
+
     for (let i = 0; i < scoresData.length; ++i) {
       const klass = LABELS[classesData[i]];
       const score = (scoresData[i] * 100).toFixed(1);
-  
+
       // Only process if the score is above 40%
       if (parseFloat(score) < 40) continue;
-  
+
       // 정규화된 좌표를 실제 캔버스 좌표로 변환
       let [x1, y1, x2, y2] = boxesData.slice(i * 4, (i + 1) * 4);
       x1 *= canvasRef.current.width;
       x2 *= canvasRef.current.width;
       y1 *= canvasRef.current.height;
       y2 *= canvasRef.current.height;
-      
+
       const width = x2 - x1;
       const height = y2 - y1;
-  
-  
+
       // draw the bounding box
       ctx.strokeStyle = '#C53030';
       ctx.lineWidth = 2;
       ctx.strokeRect(x1, y1, width, height);
-  
+
       const label = klass + ' - ' + score + '%';
       const textWidth = ctx.measureText(label).width;
       const textHeight = parseInt(font, 10);
-  
+
       // draw the label background
       ctx.fillStyle = '#C53030';
       ctx.fillRect(x1 - 1, y1 - (textHeight + 4), textWidth + 6, textHeight + 4);
-  
+
       // draw the label text
       ctx.fillStyle = '#FFFFFF';
       ctx.fillText(label, x1 + 2, y1 - (textHeight + 2));
-  
+
       // If bus is detected, crop and save the image
       if (klass === 'bus' && busProcessed < 4) {
         busProcessed++;
-  
+
         const promise = new Promise<void>((resolve) => {
           const cropCanvas = document.createElement('canvas');
           cropCanvas.width = width;
           cropCanvas.height = height;
           const cropCtx = cropCanvas.getContext('2d');
           if (!cropCtx) return resolve();
-  
+
           // sourceImg를 사용하여 크롭
           cropCtx.drawImage(sourceImg, x1, y1, width, height, 0, 0, width, height);
           const croppedImage = cropCanvas.toDataURL('image/jpeg');
-  
+
           // OCR 처리
-          // processBusImage(croppedImage, OCRProcessorType.CLOVA_CONSOLE);  
+          // processBusImage(croppedImage, OCRProcessorType.CLOVA_CONSOLE);
           processBusImage(croppedImage, OCRProcessorType.TESSERACT_CONSOLE);
           // processBusImage(croppedImage, OCRProcessorType.TESSERACT_SERVER);
           // processBusImage(croppedImage, OCRProcessorType.CLOVA_SERVER);
 
           resolve();
         });
-  
+
         processBusPromises.push(promise);
       }
     }
-  
+
     await Promise.all(processBusPromises);
   };
 
@@ -831,7 +825,7 @@ export default function Camera() {
         return word;
       }
     }
-  
+
     return null;
   };
 
