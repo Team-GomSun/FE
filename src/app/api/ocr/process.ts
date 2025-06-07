@@ -20,7 +20,7 @@ export const processOCRResult = async (data: OCRProcessRequest): Promise<OCRProc
 
   try {
     const response = await apiClient
-      .post('ocr/process', {
+      .post('bus/ocr-process', {
         json: {
           ...data,
           userId,
