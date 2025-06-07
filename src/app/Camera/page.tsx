@@ -12,6 +12,7 @@ import Webcam from 'react-webcam';
 import { BusInfo, getBusArrival } from '../api/getBusArrival';
 import { processOCRResult } from '../api/ocr/process';
 import { OCRProcessorType, OCRResult } from '../api/ocr/types';
+import * as cocoSsd from '@tensorflow-models/coco-ssd';
 
 export default function Camera() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -71,6 +72,11 @@ export default function Camera() {
     refetchInterval: 30000, // 30초
     enabled: locationStatus === true && locationTracker.hasNearbyBusStops(),
   });
+
+  // MobileNet SSD 모델 로딩
+  const [ssdModel, setSsdModel] = useState<cocoSsd.ObjectDetection | null>(null);
+  const [ssdLoading, setSsdLoading] = useState(0);
+  const ssdModelRef = useRef<cocoSsd.ObjectDetection | null>(null); // ref 추가
 
   //ai 객체인식 모델 로딩 함수 [YOLOv5 사용]
   useEffect(() => {
@@ -203,15 +209,60 @@ export default function Camera() {
     };
   }, []);
 
+  // MobileNet SSD 모델 로딩
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSsdModel = async () => {
+      try {
+        console.log('Starting MobileNet SSD model load...');
+        setSsdLoading(0.1);
+
+        const model = await cocoSsd.load({
+          base: 'mobilenet_v2'
+        });
+        setSsdLoading(0.5);
+
+        if (isMounted) {
+          setSsdModel(model);
+          ssdModelRef.current = model; // ref에도 모델 저장
+          setSsdLoading(1);
+          console.log('MobileNet SSD model ready');
+        }
+      } catch (error) {
+        console.error('Error loading MobileNet SSD model:', error);
+        if (isMounted) {
+          setSsdModel(null);
+          ssdModelRef.current = null; // ref도 초기화
+          setSsdLoading(0);
+        }
+      }
+    };
+
+    loadSsdModel();
+
+    return () => {
+      isMounted = false;
+      // cleanup
+      if (ssdModelRef.current) {
+        ssdModelRef.current = null;
+      }
+    };
+  }, []);
+
   // 여기에서 이미지를 처리하면 될 것 같아요
   const sendImageToServer = async (imageData: string) => {
     // console.log('이미지', imageData);
     if (imageData) {
-      doPredictFrame(imageData);
+      // yolov5n 모델 사용
+      // doPredictFrame(imageData);
+      // mobilenet ssd 모델 사용
+      doPredictFrame2(imageData); 
     }
   };
 
-  const doPredictFrame = async (imageData: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const doPredictFrame = async (imageData: string) => { // eslint-disable-next-line @typescript-eslint/no-unused-vars
     // ref에서 먼저 모델을 확인하고, 없으면 state에서 확인
     const modelToUse = modelRef.current || model;
 
@@ -266,12 +317,6 @@ export default function Camera() {
       const scoresData = Array.from(scores.dataSync());
       const classesData = Array.from(classes.dataSync());
 
-      // console.log('Prediction results:', {
-      //   boxes: boxesData.length,
-      //   scores: scoresData.length,
-      //   classes: classesData.length,
-      // });
-
       // build the predictions data
       await renderPrediction(boxesData, scoresData, classesData);
 
@@ -284,7 +329,7 @@ export default function Camera() {
     }
   };
 
-  const renderPrediction = async (
+  const renderPrediction = async ( 
     boxesData: number[],
     scoresData: number[],
     classesData: number[],
@@ -300,6 +345,9 @@ export default function Camera() {
     const font = '16px sans-serif';
     ctx.font = font;
     ctx.textBaseline = 'top';
+
+    const processBusPromises: Promise<void>[] = [];
+    let busProcessed = 0; // 버스 처리 개수
 
     for (let i = 0; i < scoresData.length; ++i) {
       const klass = LABELS[classesData[i]];
@@ -342,6 +390,9 @@ export default function Camera() {
         const cropCtx = cropCanvas.getContext('2d');
         if (!cropCtx) return;
 
+        if (busProcessed >= 4) continue; // 4개까지만 처리
+        busProcessed++;
+
         // Get the current frame from webcam
         const currentFrame = webcamRef.current.getScreenshot();
         if (!currentFrame) return;
@@ -351,25 +402,202 @@ export default function Camera() {
         frameImg.src = currentFrame;
 
         // Wait for the image to load
-        await new Promise((resolve) => {
-          frameImg.onload = resolve;
+        const promise = new Promise<void>((resolve) => {
+          frameImg.onload = () => {
+            const cropCanvas = document.createElement('canvas');
+            cropCanvas.width = width;
+            cropCanvas.height = height;
+            const cropCtx = cropCanvas.getContext('2d');
+            if (!cropCtx) return resolve();
+  
+            // Convert to data URL
+            cropCtx.drawImage(frameImg, x1, y1, width, height, 0, 0, width, height);
+
+            // Convert to data URL
+            const croppedImage = cropCanvas.toDataURL('image/jpeg');
+  
+            // 이미지 저장 및 OCR 처리
+            // saveAndProcessBusImage(croppedImage);
+            // OCR 처리 방식 선택 (예: Tesseract 콘솔 출력)
+            processBusImage(croppedImage, OCRProcessorType.CLOVA_CONSOLE);
+            // processBusImage(croppedImage, OCRProcessorType.TESSERACT_SERVER);
+            // processBusImage(croppedImage, OCRProcessorType.CLOVA_SERVER);
+            // processBusImage(croppedImage, OCRProcessorType.TESSERACT_CONSOLE);
+          };
         });
 
-        // Crop the image
-        cropCtx.drawImage(frameImg, x1, y1, width, height, 0, 0, width, height);
-
-        // Convert to data URL
-        const croppedImage = cropCanvas.toDataURL('image/jpeg');
-
-        // 이미지 저장 및 OCR 처리
-        // saveAndProcessBusImage(croppedImage);
-        // OCR 처리 방식 선택 (예: Tesseract 콘솔 출력)
-        // await processBusImage(croppedImage, OCRProcessorType.CLOVA_CONSOLE);
-        // await processBusImage(croppedImage, OCRProcessorType.TESSERACT_SERVER);
-        // await processBusImage(croppedImage, OCRProcessorType.CLOVA_SERVER);
-        await processBusImage(croppedImage, OCRProcessorType.TESSERACT_CONSOLE);
+        processBusPromises.push(promise);
       }
     }
+
+    await Promise.all(processBusPromises);
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const doPredictFrame2 = async (imageData: string) => {
+    // ref에서 먼저 모델을 확인하고, 없으면 state에서 확인
+    const modelToUse = modelRef.current || model;
+    const ssdModelToUse = ssdModelRef.current || ssdModel;
+  
+    if (!modelToUse || !ssdModelToUse) {
+      console.log('Models not loaded', {
+        yolo: !!modelToUse,
+        ssd: !!ssdModelToUse,
+        ssdRef: !!ssdModelRef.current,
+        ssdState: !!ssdModel
+      });
+      return;
+    }
+  
+    tf.engine().startScope();
+    try {
+      // Create a temporary image element to load the screenshot
+      const img = new Image();
+      img.src = imageData;
+  
+      await new Promise((resolve, reject) => {
+        img.onload = () => {
+          // 이미지 로드 완료 후 캔버스 크기 설정
+          if (canvasRef.current) {
+            canvasRef.current.width = img.width;
+            canvasRef.current.height = img.height;
+          }
+          resolve(void 0);
+        };
+        img.onerror = reject;
+      });
+  
+      // MobileNet SSD 모델 사용
+      console.log('Running SSD prediction...');
+      const predictions = await ssdModelToUse.detect(img);
+  
+      // SSD 예측 결과를 처리
+      const boxesData: number[] = [];
+      const scoresData: number[] = [];
+      const classesData: number[] = [];
+  
+      predictions.forEach((prediction) => {
+        // prediction.bbox 형식 확인 및 정규화
+        const [x, y, width, height] = prediction.bbox;
+        
+        // bbox가 절대 좌표인 경우 정규화 
+        const normalizedX1 = x / img.width;
+        const normalizedY1 = y / img.height;
+        const normalizedX2 = (x + width) / img.width;
+        const normalizedY2 = (y + height) / img.height;
+        
+        
+        boxesData.push(normalizedX1, normalizedY1, normalizedX2, normalizedY2);
+        scoresData.push(prediction.score);
+        
+        // COCO 클래스 ID 매핑
+        const classId = prediction.class === 'bus' ? 5 : -1;
+        classesData.push(classId);
+        
+      });
+  
+      // 변환된 데이터로 예측 결과 렌더링
+      await renderPrediction2(boxesData, scoresData, classesData, img);
+  
+    } catch (error) {
+      console.error('Error in prediction:', error);
+    } finally {
+      tf.engine().endScope();
+    }
+  };
+  
+  const renderPrediction2 = async (
+    boxesData: number[],
+    scoresData: number[],
+    classesData: number[],
+    sourceImg: HTMLImageElement // 추가: 원본 이미지 참조
+  ) => {
+    if (!canvasRef.current) {
+      console.log('Canvas ref not available');
+      return;
+    }
+  
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) {
+      console.log('Canvas context not available');
+      return;
+    }
+  
+  
+    // clean canvas
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  
+    const font = '16px sans-serif';
+    ctx.font = font;
+    ctx.textBaseline = 'top';
+  
+    const processBusPromises: Promise<void>[] = [];
+    let busProcessed = 0;
+  
+    for (let i = 0; i < scoresData.length; ++i) {
+      const klass = LABELS[classesData[i]];
+      const score = (scoresData[i] * 100).toFixed(1);
+  
+      // Only process if the score is above 40%
+      if (parseFloat(score) < 40) continue;
+  
+      // 정규화된 좌표를 실제 캔버스 좌표로 변환
+      let [x1, y1, x2, y2] = boxesData.slice(i * 4, (i + 1) * 4);
+      x1 *= canvasRef.current.width;
+      x2 *= canvasRef.current.width;
+      y1 *= canvasRef.current.height;
+      y2 *= canvasRef.current.height;
+      
+      const width = x2 - x1;
+      const height = y2 - y1;
+  
+  
+      // draw the bounding box
+      ctx.strokeStyle = '#C53030';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x1, y1, width, height);
+  
+      const label = klass + ' - ' + score + '%';
+      const textWidth = ctx.measureText(label).width;
+      const textHeight = parseInt(font, 10);
+  
+      // draw the label background
+      ctx.fillStyle = '#C53030';
+      ctx.fillRect(x1 - 1, y1 - (textHeight + 4), textWidth + 6, textHeight + 4);
+  
+      // draw the label text
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(label, x1 + 2, y1 - (textHeight + 2));
+  
+      // If bus is detected, crop and save the image
+      if (klass === 'bus' && busProcessed < 4) {
+        busProcessed++;
+  
+        const promise = new Promise<void>((resolve) => {
+          const cropCanvas = document.createElement('canvas');
+          cropCanvas.width = width;
+          cropCanvas.height = height;
+          const cropCtx = cropCanvas.getContext('2d');
+          if (!cropCtx) return resolve();
+  
+          // sourceImg를 사용하여 크롭
+          cropCtx.drawImage(sourceImg, x1, y1, width, height, 0, 0, width, height);
+          const croppedImage = cropCanvas.toDataURL('image/jpeg');
+  
+          // OCR 처리
+          // processBusImage(croppedImage, OCRProcessorType.CLOVA_CONSOLE);  
+          processBusImage(croppedImage, OCRProcessorType.TESSERACT_CONSOLE);
+          // processBusImage(croppedImage, OCRProcessorType.TESSERACT_SERVER);
+          // processBusImage(croppedImage, OCRProcessorType.CLOVA_SERVER);
+
+          resolve();
+        });
+  
+        processBusPromises.push(promise);
+      }
+    }
+  
+    await Promise.all(processBusPromises);
   };
 
   // OCR API 호출 함수
@@ -504,6 +732,7 @@ export default function Camera() {
       console.log('Tesseract OCR 결과:', result.data.text);
 
       const busNumber = extractBusNumberFromText(result.data.text);
+      console.log('Tesseract text 결과: ', busNumber);
       const isMatching = busNumber ? checkBusMatch(busNumber) : false;
 
       return {
@@ -570,15 +799,16 @@ export default function Camera() {
       //버스 번호 패턴
       const busNumberPatterns = [
         /^\d{1,4}[-\s]?\d{1,4}$/, // 일반 버스 (1, 1234-5678)
-        /^[가-힣]\d{1,4}$/, // 마을버스 (강남1)
+        /^[가-힣]{1,4}\d{1,4}$/, // 마을버스 (강남1)
         /^[A-Z]\d{1,4}$/, // 공항버스 (A1)
         /^[가-힣]\d{1,4}[-\s]?\d{1,4}$/, // 지선버스 (강남1-1234) 더 있으면 추후 추가
       ];
 
       for (const field of fields) {
-        const text = field.inferText.replace(/\s/g, '');
+        const text = field.inferText.replace(/[\s·•-]/g, '');
         for (const pattern of busNumberPatterns) {
           if (pattern.test(text)) {
+            console.log('버스 번호 추출 성공:', text);
             return text;
           }
         }
@@ -593,21 +823,15 @@ export default function Camera() {
 
   // 버스 번호 추출 헬퍼 함수 (텍스트용)
   const extractBusNumberFromText = (text: string): string | null => {
-    const busNumberPatterns = [
-      /^\d{1,4}[-\s]?\d{1,4}$/,
-      /^[가-힣]\d{1,4}$/,
-      /^[A-Z]\d{1,4}$/,
-      /^[가-힣]\d{1,4}[-\s]?\d{1,4}$/,
-    ];
-
     const words = text.split(/\s+/);
+
     for (const word of words) {
-      for (const pattern of busNumberPatterns) {
-        if (pattern.test(word)) {
-          return word;
-        }
+      // 순수 숫자만으로 이루어진 단어 추출
+      if (/^\d+$/.test(word)) {
+        return word;
       }
     }
+  
     return null;
   };
 
@@ -688,7 +912,7 @@ export default function Camera() {
   }, [hasPermission, continuousCapture]);
 
   // 모델 로딩 상태에 따른 UI 처리
-  if (loading < 1 || workerLoading < 1) {
+  if (loading < 1 || workerLoading < 1 || ssdLoading < 1) {
     return (
       <div className="flex h-screen flex-col items-center justify-center">
         <div className="text-center">
@@ -702,9 +926,14 @@ export default function Camera() {
               className="h-2 rounded-full bg-blue-500 transition-all duration-300"
               style={{ width: `${workerLoading * 100}%` }}
             />
+            <div
+              className="h-2 rounded-full bg-blue-500 transition-all duration-300"
+              style={{ width: `${ssdLoading * 100}%` }}
+            />
           </div>
           <p className="mt-2 text-sm text-gray-600">{Math.round(loading * 100)}%</p>
           <p className="mt-2 text-sm text-gray-600">{Math.round(workerLoading * 100)}%</p>
+          <p className="mt-2 text-sm text-gray-600">{Math.round(ssdLoading * 100)}%</p>
         </div>
       </div>
     );
