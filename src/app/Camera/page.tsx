@@ -527,7 +527,7 @@ export default function Camera() {
         ctx.fillStyle = '#FFFFFF';
         ctx.fillText(label, x1 + 2, y1 - (textHeight + 2));
 
-      // If bus is detected, crop and save the image
+        // If bus is detected, crop and save the image
         busProcessed++;
 
         const promise = new Promise<void>((resolve) => {
@@ -750,7 +750,7 @@ export default function Camera() {
       <div className="flex h-screen flex-col items-center justify-center">
         <div className="text-center">
           <p className="mb-4 text-lg font-medium">모델 로딩 중...</p>
-          
+
           {/* YOLOv5 모델 로딩 상태 */}
           <div className="mb-4">
             <p className="mb-2 text-sm font-medium text-blue-600">YOLOv5 모델</p>
