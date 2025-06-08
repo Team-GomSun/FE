@@ -7,12 +7,14 @@ import { useQuery } from '@tanstack/react-query';
 import * as cocoSsd from '@tensorflow-models/coco-ssd';
 import * as tf from '@tensorflow/tfjs';
 import '@tensorflow/tfjs-backend-webgl';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Webcam from 'react-webcam';
 import { BusArrivalResult, getBusArrival } from '../api/getBusArrival';
 import { getBusNumber } from '../api/userUtils';
 
 export default function Camera() {
+  const router = useRouter();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const webcamRef = useRef<Webcam>(null);
   const captureInterval = useRef<NodeJS.Timeout | null>(null);
@@ -884,19 +886,28 @@ export default function Camera() {
             style={{ zIndex: 1 }}
           />
         )}
+        <div className="absolute top-4 right-4 left-4 flex justify-between" style={{ zIndex: 3 }}>
+          <button
+            onClick={() => setShowCanvas(!showCanvas)}
+            className="bg-opacity-50 hover:bg-opacity-70 rounded-lg bg-black px-3 py-2 text-white transition-all"
+          >
+            {showCanvas ? '감지 숨기기' : '감지 표시'}
+          </button>
+          <button
+            onClick={() => setIsNightMode(!isNightMode)}
+            className="bg-opacity-50 hover:bg-opacity-70 rounded-lg bg-black px-3 py-2 text-white transition-all"
+          >
+            {isNightMode ? '☀️' : '🌙'}
+          </button>
+        </div>
+
+        {/* 버스 번호 변경 버튼 */}
         <button
-          onClick={() => setShowCanvas(!showCanvas)}
-          className="bg-opacity-50 hover:bg-opacity-70 absolute top-4 left-4 rounded-lg bg-black px-3 py-2 text-white transition-all"
+          onClick={() => router.push('/BusSearch')}
+          className="absolute right-2 bottom-2 rounded-full bg-[#ffd700] px-3 py-1.5 text-sm font-medium text-[#353535] shadow transition-all hover:bg-yellow-400"
           style={{ zIndex: 3 }}
         >
-          {showCanvas ? '감지 숨기기' : '감지 표시'}
-        </button>
-        <button
-          onClick={() => setIsNightMode(!isNightMode)}
-          className="bg-opacity-50 hover:bg-opacity-70 absolute top-4 right-4 rounded-lg bg-black px-3 py-2 text-white transition-all"
-          style={{ zIndex: 3 }}
-        >
-          {isNightMode ? '☀️' : '🌙'}
+          버스번호 등록
         </button>
 
         {/* 수정된 Bus Arrival Notification */}

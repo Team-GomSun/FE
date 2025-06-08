@@ -11,12 +11,19 @@ export default function Home() {
   const [onboardingDone, setOnboardingDone] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowOnboarding(true), 3000); // 3초 후 온보딩
-    return () => clearTimeout(timer);
-  }, []);
+    const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
+
+    if (hasSeenOnboarding === 'true') {
+      router.push('/BusSearch');
+    } else {
+      const timer = setTimeout(() => setShowOnboarding(true), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [router]);
 
   useEffect(() => {
     if (onboardingDone) {
+      localStorage.setItem('hasSeenOnboarding', 'true');
       router.push('/BusSearch');
     }
   }, [onboardingDone, router]);
