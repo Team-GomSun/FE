@@ -774,11 +774,15 @@ export default function Camera() {
   };
 
   const capture = useCallback(() => {
+    if (!busArrivalData || !busArrivalData.hasNearbyStops) {
+      console.log('busArrivalData가 준비되지 않음, OCR 실행 보류');
+      return;
+    }
     const imageSrc = webcamRef.current?.getScreenshot();
     if (imageSrc) {
       sendImageToServer(imageSrc);
     }
-  }, [isNightMode]);
+  }, [isNightMode, busArrivalData]);
 
   const continuousCapture = useCallback(() => {
     if (captureInterval.current) {
@@ -913,7 +917,7 @@ export default function Camera() {
         {/* 수정된 Bus Arrival Notification */}
         {showNotification && (
           <div
-            className="absolute top-4 right-0 left-0 mx-auto w-4/5 rounded-lg bg-green-500 p-4 text-center text-white shadow-lg"
+            className="absolute top-4 right-0 left-0 mx-auto w-4/5 rounded-lg bg-[#fff9db] p-4 text-center text-[#353535] shadow-lg"
             style={{ zIndex: 2 }}
           >
             <p className="text-lg font-bold">등록한 버스가 도착했습니다!</p>
