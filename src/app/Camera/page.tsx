@@ -9,12 +9,14 @@ import '@tensorflow/tfjs-backend-webgl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Webcam from 'react-webcam';
 import { BusArrivalResult, getBusArrival } from '../api/getBusArrival';
+import * as cocoSsd from '@tensorflow-models/coco-ssd';
 
 export default function Camera() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const webcamRef = useRef<Webcam>(null);
   const captureInterval = useRef<NodeJS.Timeout | null>(null);
   const [showCanvas, setShowCanvas] = useState(true);
+  const [isNightMode, setIsNightMode] = useState(true);
 
   const requestCameraPermission = () => {
     setHasPermission(null);
@@ -184,16 +186,72 @@ export default function Camera() {
     };
   }, [modelName]);
 
+  // MobileNet SSD 모델 로딩
+  const [ssdModel, setSsdModel] = useState<cocoSsd.ObjectDetection | null>(null);
+  const [ssdLoading, setSsdLoading] = useState(0);
+  const ssdModelRef = useRef<cocoSsd.ObjectDetection | null>(null); // ref 추가
+
+  // MobileNet SSD 모델 로딩
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSsdModel = async () => {
+      try {
+        console.log('Starting MobileNet SSD model load...');
+        setSsdLoading(0.1);
+
+        const model = await cocoSsd.load({
+          base: 'mobilenet_v2',
+        });
+        setSsdLoading(0.5);
+
+        if (isMounted) {
+          setSsdModel(model);
+          ssdModelRef.current = model; // ref에도 모델 저장
+          setSsdLoading(1);
+          console.log('MobileNet SSD model ready');
+        }
+      } catch (error) {
+        console.error('Error loading MobileNet SSD model:', error);
+        if (isMounted) {
+          setSsdModel(null);
+          ssdModelRef.current = null; // ref도 초기화
+          setSsdLoading(0);
+        }
+      }
+    };
+
+    loadSsdModel();
+
+    return () => {
+      isMounted = false;
+      // cleanup
+      if (ssdModelRef.current) {
+        ssdModelRef.current = null;
+      }
+    };
+  }, []);
+
   // 여기에서 이미지를 처리하면 될 것 같아요
   const sendImageToServer = async (imageData: string) => {
-    // console.log('이미지', imageData);
     if (imageData) {
-      doPredictFrame(imageData);
+      // 메모리 정리
+      tf.engine().startScope();
+      try {
+        if (isNightMode) {
+          await doPredictFrame(imageData); // yolov5n 모델 사용
+        } else {
+          await doPredictFrame2(imageData); // mobilenet ssd 모델 사용
+        }
+      } finally {
+        // 메모리 정리
+        tf.disposeVariables();
+        tf.engine().endScope();
+      }
     }
   };
 
   const doPredictFrame = async (imageData: string) => {
-    // ref에서 먼저 모델을 확인하고, 없으면 state에서 확인
     const modelToUse = modelRef.current || model;
 
     if (!modelToUse) {
@@ -201,7 +259,6 @@ export default function Camera() {
       return;
     }
 
-    tf.engine().startScope();
     try {
       // Create a temporary image element to load the screenshot
       const img = new Image();
@@ -218,7 +275,7 @@ export default function Camera() {
       }
 
       // get width and height from model's shape for resizing image
-      const inputShape = modelToUse.inputs[0]?.shape; // model 대신 modelToUse 사용
+      const inputShape = modelToUse.inputs[0]?.shape;
       if (!inputShape) {
         console.log('No input shape found');
         return;
@@ -235,8 +292,8 @@ export default function Camera() {
       });
 
       // predicting...
-      console.log('Running prediction...');
-      const res = await modelToUse.executeAsync(input); // model 대신 modelToUse 사용
+      console.log('Running YOLOv5 prediction...');
+      const res = await modelToUse.executeAsync(input);
       if (!Array.isArray(res)) {
         console.log('Model output is not an array');
         return;
@@ -247,21 +304,13 @@ export default function Camera() {
       const scoresData = Array.from(scores.dataSync());
       const classesData = Array.from(classes.dataSync());
 
-      // console.log('Prediction results:', {
-      //   boxes: boxesData.length,
-      //   scores: scoresData.length,
-      //   classes: classesData.length,
-      // });
-
       // build the predictions data
       await renderPrediction(boxesData, scoresData, classesData);
 
       // clear memory
-      tf.dispose(res);
+      tf.dispose([boxes, scores, classes, input]);
     } catch (error) {
-      console.error('Error in prediction:', error);
-    } finally {
-      tf.engine().endScope();
+      console.error('Error in YOLOv5 prediction:', error);
     }
   };
 
@@ -282,12 +331,15 @@ export default function Camera() {
     ctx.font = font;
     ctx.textBaseline = 'top';
 
+    const processBusPromises: Promise<void>[] = [];
+    let busProcessed = 0; // 버스 처리 개수
+
     for (let i = 0; i < scoresData.length; ++i) {
       const klass = LABELS[classesData[i]];
       const score = (scoresData[i] * 100).toFixed(1);
 
       // Only process if the score is above 40%
-      if (parseFloat(score) < 40) continue;
+      if (parseFloat(score) < 30) continue;
 
       let [x1, y1, x2, y2] = boxesData.slice(i * 4, (i + 1) * 4);
       x1 *= canvasRef.current.width;
@@ -297,8 +349,8 @@ export default function Camera() {
       const width = x2 - x1;
       const height = y2 - y1;
 
-      // showCanvas가 true일 때만 캔버스에 그리기
-      if (showCanvas) {
+      if (klass === 'bus') {
+        // draw the bounding box
         ctx.strokeStyle = '#C53030';
         ctx.lineWidth = 2;
         ctx.strokeRect(x1, y1, width, height);
@@ -314,16 +366,16 @@ export default function Camera() {
         // draw the label text
         ctx.fillStyle = '#FFFFFF';
         ctx.fillText(label, x1 + 2, y1 - (textHeight + 2));
-      }
 
-      // If bus is detected, crop and save the image
-      if (klass === 'bus') {
         // Create a new canvas for the cropped image
         const cropCanvas = document.createElement('canvas');
         cropCanvas.width = width;
         cropCanvas.height = height;
         const cropCtx = cropCanvas.getContext('2d');
         if (!cropCtx) return;
+
+        if (busProcessed >= 4) continue; // 4개까지만 처리
+        busProcessed++;
 
         // Get the current frame from webcam
         const currentFrame = webcamRef.current.getScreenshot();
@@ -334,22 +386,173 @@ export default function Camera() {
         frameImg.src = currentFrame;
 
         // Wait for the image to load
-        await new Promise((resolve) => {
-          frameImg.onload = resolve;
+        const promise = new Promise<void>((resolve) => {
+          frameImg.onload = () => {
+            const cropCanvas = document.createElement('canvas');
+            cropCanvas.width = width;
+            cropCanvas.height = height;
+            const cropCtx = cropCanvas.getContext('2d');
+            if (!cropCtx) return resolve();
+
+            // Convert to data URL
+            cropCtx.drawImage(frameImg, x1, y1, width, height, 0, 0, width, height);
+
+            // Convert to data URL
+            const croppedImage = cropCanvas.toDataURL('image/jpeg');
+
+            // 이미지 저장 및 OCR 처리
+            saveAndProcessBusImage(croppedImage);
+          };
         });
 
-        // Crop the image
-        cropCtx.drawImage(frameImg, x1, y1, width, height, 0, 0, width, height);
-
-        // Convert to data URL
-        const croppedImage = cropCanvas.toDataURL('image/jpeg');
-
-        // 이미지 저장 및 OCR 처리
-        saveAndProcessBusImage(croppedImage);
+        processBusPromises.push(promise);
       }
+    }
+
+    await Promise.all(processBusPromises);
+  };
+
+  const doPredictFrame2 = async (imageData: string) => {
+    const ssdModelToUse = ssdModelRef.current || ssdModel;
+
+    if (!ssdModelToUse) {
+      console.log('SSD Model not loaded');
+      return;
+    }
+
+    try {
+      // Create a temporary image element to load the screenshot
+      const img = new Image();
+      img.src = imageData;
+
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+
+      // Set canvas size to match image
+      if (canvasRef.current) {
+        canvasRef.current.width = img.width;
+        canvasRef.current.height = img.height;
+      }
+
+      // MobileNet SSD 모델 사용
+      console.log('Running SSD prediction...');
+      const predictions = await ssdModelToUse.detect(img);
+
+      // SSD 예측 결과를 처리
+      const boxesData: number[] = [];
+      const scoresData: number[] = [];
+      const classesData: number[] = [];
+
+      predictions.forEach((prediction) => {
+        const [x, y, width, height] = prediction.bbox;
+        const normalizedX1 = x / img.width;
+        const normalizedY1 = y / img.height;
+        const normalizedX2 = (x + width) / img.width;
+        const normalizedY2 = (y + height) / img.height;
+
+        boxesData.push(normalizedX1, normalizedY1, normalizedX2, normalizedY2);
+        scoresData.push(prediction.score);
+        const classId = prediction.class === 'bus' ? 5 : -1;
+        classesData.push(classId);
+      });
+
+      // 변환된 데이터로 예측 결과 렌더링
+      await renderPrediction2(boxesData, scoresData, classesData, img);
+    } catch (error) {
+      console.error('Error in SSD prediction:', error);
     }
   };
 
+  const renderPrediction2 = async (
+    boxesData: number[],
+    scoresData: number[],
+    classesData: number[],
+    sourceImg: HTMLImageElement, // 추가: 원본 이미지 참조
+  ) => {
+    if (!canvasRef.current) {
+      console.log('Canvas ref not available');
+      return;
+    }
+
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) {
+      console.log('Canvas context not available');
+      return;
+    }
+
+    // clean canvas
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+    const font = '16px sans-serif';
+    ctx.font = font;
+    ctx.textBaseline = 'top';
+
+    const processBusPromises: Promise<void>[] = [];
+    let busProcessed = 0;
+
+    for (let i = 0; i < scoresData.length; ++i) {
+      const klass = LABELS[classesData[i]];
+      const score = (scoresData[i] * 100).toFixed(1);
+
+      // Only process if the score is above 40%
+      if (parseFloat(score) < 40) continue;
+
+      // 정규화된 좌표를 실제 캔버스 좌표로 변환
+      let [x1, y1, x2, y2] = boxesData.slice(i * 4, (i + 1) * 4);
+      x1 *= canvasRef.current.width;
+      x2 *= canvasRef.current.width;
+      y1 *= canvasRef.current.height;
+      y2 *= canvasRef.current.height;
+
+      const width = x2 - x1;
+      const height = y2 - y1;
+
+      if (klass === 'bus' && busProcessed < 4) {
+        // draw the bounding box
+        ctx.strokeStyle = '#C53030';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x1, y1, width, height);
+
+        const label = klass + ' - ' + score + '%';
+        const textWidth = ctx.measureText(label).width;
+        const textHeight = parseInt(font, 10);
+
+        // draw the label background
+        ctx.fillStyle = '#C53030';
+        ctx.fillRect(x1 - 1, y1 - (textHeight + 4), textWidth + 6, textHeight + 4);
+
+        // draw the label text
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(label, x1 + 2, y1 - (textHeight + 2));
+
+      // If bus is detected, crop and save the image
+        busProcessed++;
+
+        const promise = new Promise<void>((resolve) => {
+          const cropCanvas = document.createElement('canvas');
+          cropCanvas.width = width;
+          cropCanvas.height = height;
+          const cropCtx = cropCanvas.getContext('2d');
+          if (!cropCtx) return resolve();
+
+          // sourceImg를 사용하여 크롭
+          cropCtx.drawImage(sourceImg, x1, y1, width, height, 0, 0, width, height);
+          const croppedImage = cropCanvas.toDataURL('image/jpeg');
+
+          // OCR 처리
+          saveAndProcessBusImage(croppedImage);
+
+          resolve();
+        });
+
+        processBusPromises.push(promise);
+      }
+    }
+
+    await Promise.all(processBusPromises);
+  };
   // OCR API 호출 함수
   const callOCRAPI = async (imageData: string): Promise<OCRResponse> => {
     try {
@@ -488,13 +691,13 @@ export default function Camera() {
       //버스 번호 패턴
       const busNumberPatterns = [
         /^\d{1,4}[-\s]?\d{1,4}$/, // 일반 버스 (1, 1234-5678)
-        /^[가-힣]\d{1,4}$/, // 마을버스 (강남1)
+        /^[가-힣]{1,4}\d{1,4}$/, // 마을버스 (강남1)
         /^[A-Z]\d{1,4}$/, // 공항버스 (A1)
         /^[가-힣]\d{1,4}[-\s]?\d{1,4}$/, // 지선버스 (강남1-1234) 더 있으면 추후 추가
       ];
 
       for (const field of fields) {
-        const text = field.inferText.replace(/\s/g, '');
+        const text = field.inferText.replace(/[\s·•-]/g, '');
         for (const pattern of busNumberPatterns) {
           if (pattern.test(text)) {
             return text;
@@ -514,7 +717,7 @@ export default function Camera() {
     if (imageSrc) {
       sendImageToServer(imageSrc);
     }
-  }, []);
+  }, [isNightMode]);
 
   const continuousCapture = useCallback(() => {
     if (captureInterval.current) {
@@ -524,7 +727,7 @@ export default function Camera() {
     captureInterval.current = setInterval(() => {
       capture();
     }, 1000);
-  }, [capture]);
+  }, [capture, isNightMode]);
 
   useEffect(() => {
     requestCameraPermission();
@@ -539,21 +742,38 @@ export default function Camera() {
     if (hasPermission === true) {
       continuousCapture();
     }
-  }, [hasPermission, continuousCapture]);
+  }, [hasPermission, continuousCapture, isNightMode]);
 
   // 모델 로딩 상태에 따른 UI 처리
-  if (loading < 1) {
+  if (loading < 1 || ssdLoading < 1) {
     return (
       <div className="flex h-screen flex-col items-center justify-center">
         <div className="text-center">
           <p className="mb-4 text-lg font-medium">모델 로딩 중...</p>
-          <div className="w-64 rounded-full bg-gray-200">
-            <div
-              className="h-2 rounded-full bg-blue-500 transition-all duration-300"
-              style={{ width: `${loading * 100}%` }}
-            />
+          
+          {/* YOLOv5 모델 로딩 상태 */}
+          <div className="mb-4">
+            <p className="mb-2 text-sm font-medium text-blue-600">YOLOv5 모델</p>
+            <div className="w-64 rounded-full bg-gray-200">
+              <div
+                className="h-2 rounded-full bg-blue-500 transition-all duration-300"
+                style={{ width: `${loading * 100}%` }}
+              />
+            </div>
+            <p className="mt-1 text-sm text-blue-600">{Math.round(loading * 100)}%</p>
           </div>
-          <p className="mt-2 text-sm text-gray-600">{Math.round(loading * 100)}%</p>
+
+          {/* MobileNet SSD 모델 로딩 상태 */}
+          <div>
+            <p className="mb-2 text-sm font-medium text-green-600">MobileNet SSD 모델</p>
+            <div className="w-64 rounded-full bg-gray-200">
+              <div
+                className="h-2 rounded-full bg-green-500 transition-all duration-300"
+                style={{ width: `${ssdLoading * 100}%` }}
+              />
+            </div>
+            <p className="mt-1 text-sm text-green-600">{Math.round(ssdLoading * 100)}%</p>
+          </div>
         </div>
       </div>
     );
@@ -611,6 +831,13 @@ export default function Camera() {
           style={{ zIndex: 3 }}
         >
           {showCanvas ? '감지 숨기기' : '감지 표시'}
+        </button>
+        <button
+          onClick={() => setIsNightMode(!isNightMode)}
+          className="bg-opacity-50 hover:bg-opacity-70 absolute top-4 right-4 rounded-lg bg-black px-3 py-2 text-white transition-all"
+          style={{ zIndex: 3 }}
+        >
+          {isNightMode ? '☀️' : '🌙'}
         </button>
 
         {/* Bus Arrival Notification */}
