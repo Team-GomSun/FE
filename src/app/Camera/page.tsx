@@ -918,7 +918,7 @@ export default function Camera() {
         {showNotification && (
           <div
             className="absolute top-4 right-0 left-0 mx-auto w-4/5 rounded-lg bg-[#fff9db] p-4 text-center text-[#353535] shadow-lg"
-            style={{ zIndex: 2 }}
+            style={{ zIndex: 50 }}
           >
             <p className="text-lg font-bold">등록한 버스가 도착했습니다!</p>
             <p>{detectedBus}번 버스가 곧 도착합니다</p>
