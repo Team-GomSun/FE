@@ -15,6 +15,7 @@ export default function Camera() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const webcamRef = useRef<Webcam>(null);
   const captureInterval = useRef<NodeJS.Timeout | null>(null);
+  const [showCanvas, setShowCanvas] = useState(true);
 
   const requestCameraPermission = () => {
     setHasPermission(null);
@@ -307,22 +308,24 @@ export default function Camera() {
       const width = x2 - x1;
       const height = y2 - y1;
 
-      // draw the bounding box
-      ctx.strokeStyle = '#C53030';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x1, y1, width, height);
+      // showCanvas가 true일 때만 캔버스에 그리기
+      if (showCanvas) {
+        ctx.strokeStyle = '#C53030';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x1, y1, width, height);
 
-      const label = klass + ' - ' + score + '%';
-      const textWidth = ctx.measureText(label).width;
-      const textHeight = parseInt(font, 10); // base 10
+        const label = klass + ' - ' + score + '%';
+        const textWidth = ctx.measureText(label).width;
+        const textHeight = parseInt(font, 10); // base 10
 
-      // draw the label background
-      ctx.fillStyle = '#C53030';
-      ctx.fillRect(x1 - 1, y1 - (textHeight + 4), textWidth + 6, textHeight + 4);
+        // draw the label background
+        ctx.fillStyle = '#C53030';
+        ctx.fillRect(x1 - 1, y1 - (textHeight + 4), textWidth + 6, textHeight + 4);
 
-      // draw the label text
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillText(label, x1 + 2, y1 - (textHeight + 2));
+        // draw the label text
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(label, x1 + 2, y1 - (textHeight + 2));
+      }
 
       // If bus is detected, crop and save the image
       if (klass === 'bus') {
@@ -652,11 +655,22 @@ export default function Camera() {
           className="h-full w-full object-cover"
           screenshotQuality={1}
         />
-        <canvas
-          ref={canvasRef}
-          className="absolute top-0 left-0 h-full w-full"
-          style={{ zIndex: 1 }}
-        />
+
+        {/* 캔버스 표시 조건부 렌더링 */}
+        {showCanvas && (
+          <canvas
+            ref={canvasRef}
+            className="absolute top-0 left-0 h-full w-full"
+            style={{ zIndex: 1 }}
+          />
+        )}
+        <button
+          onClick={() => setShowCanvas(!showCanvas)}
+          className="bg-opacity-50 hover:bg-opacity-70 absolute top-4 left-4 rounded-lg bg-black px-3 py-2 text-white transition-all"
+          style={{ zIndex: 3 }}
+        >
+          {showCanvas ? '감지 숨기기' : '감지 표시'}
+        </button>
 
         {/* 수정된 Bus Arrival Notification */}
         {showNotification && (
