@@ -9,6 +9,8 @@ export interface OCRProcessResponse {
   code: number;
   message: string;
   result: {
+    processedBusNumber: string;
+    matchType: string;
     busNumber: string;
     isMatching: boolean;
   };
