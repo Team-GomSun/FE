@@ -1,5 +1,6 @@
 'use client';
 
+import ErrorToast from '@/components/ErrorToast';
 import locationTracker from '@/hooks/locationTracker';
 import { OCRResponse } from '@/types/ocr';
 import LABELS from '@app-datasets/coco/classes.json';
@@ -20,6 +21,7 @@ export default function Camera() {
   const captureInterval = useRef<NodeJS.Timeout | null>(null);
   const [showCanvas, setShowCanvas] = useState(true);
   const [isNightMode, setIsNightMode] = useState(true);
+  const [showNoStopToast, setShowNoStopToast] = useState(false);
 
   const requestCameraPermission = () => {
     setHasPermission(null);
@@ -809,6 +811,12 @@ export default function Camera() {
     }
   }, [hasPermission, continuousCapture, isNightMode]);
 
+  useEffect(() => {
+    if (hasNearbyStops === false) {
+      setShowNoStopToast(true);
+    }
+  }, [hasNearbyStops]);
+
   // 모델 로딩 상태에 따른 UI 처리
   if (loading < 1 || ssdLoading < 1) {
     return (
@@ -868,117 +876,127 @@ export default function Camera() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-white">
-      <div className="relative aspect-[3/4] max-h-[60vh] w-full overflow-hidden">
-        <Webcam
-          audio={false}
-          ref={webcamRef}
-          screenshotFormat="image/jpeg"
-          videoConstraints={{
-            facingMode: 'environment',
-            aspectRatio: 4 / 3,
-          }}
-          className="h-full w-full object-cover"
-          screenshotQuality={1}
+    <>
+      {showNoStopToast && (
+        <ErrorToast
+          message="주변에 정류장이 없습니다"
+          description="근처에 버스 정류장이 없습니다"
+          onClose={() => setShowNoStopToast(false)}
+          isVisible={showNoStopToast}
         />
-
-        {/* 캔버스 표시 조건부 렌더링 */}
-        {showCanvas && (
-          <canvas
-            ref={canvasRef}
-            className="absolute top-0 left-0 h-full w-full"
-            style={{ zIndex: 1 }}
+      )}
+      <div className="flex h-screen flex-col bg-white">
+        <div className="relative aspect-[3/4] max-h-[60vh] w-full overflow-hidden">
+          <Webcam
+            audio={false}
+            ref={webcamRef}
+            screenshotFormat="image/jpeg"
+            videoConstraints={{
+              facingMode: 'environment',
+              aspectRatio: 4 / 3,
+            }}
+            className="h-full w-full object-cover"
+            screenshotQuality={1}
           />
-        )}
-        <div className="absolute top-4 right-4 left-4 flex justify-between" style={{ zIndex: 3 }}>
-          <button
-            onClick={() => setShowCanvas(!showCanvas)}
-            className="bg-opacity-50 hover:bg-opacity-70 rounded-lg bg-black px-3 py-2 text-white transition-all"
-          >
-            {showCanvas ? '감지 숨기기' : '감지 표시'}
-          </button>
-          <button
-            onClick={() => setIsNightMode(!isNightMode)}
-            className="bg-opacity-50 hover:bg-opacity-70 rounded-lg bg-black px-3 py-2 text-white transition-all"
-          >
-            {isNightMode ? '☀️' : '🌙'}
-          </button>
-        </div>
 
-        {/* 버스 번호 변경 버튼 */}
-        <button
-          onClick={() => router.push('/BusSearch')}
-          className="absolute right-2 bottom-2 rounded-full bg-[#ffd700] px-3 py-1.5 text-sm font-medium text-[#353535] shadow transition-all hover:bg-yellow-400"
-          style={{ zIndex: 3 }}
-        >
-          버스번호 등록
-        </button>
-
-        {/* 수정된 Bus Arrival Notification */}
-        {showNotification && (
-          <div
-            className="absolute top-4 right-0 left-0 mx-auto w-4/5 rounded-lg bg-[#fff9db] p-4 text-center text-[#353535] shadow-lg"
-            style={{ zIndex: 50 }}
-          >
-            <p className="text-lg font-bold">등록한 버스가 도착했습니다!</p>
-            <p>{detectedBus}번 버스가 곧 도착합니다</p>
+          {/* 캔버스 표시 조건부 렌더링 */}
+          {showCanvas && (
+            <canvas
+              ref={canvasRef}
+              className="absolute top-0 left-0 h-full w-full"
+              style={{ zIndex: 1 }}
+            />
+          )}
+          <div className="absolute top-4 right-4 left-4 flex justify-between" style={{ zIndex: 3 }}>
+            <button
+              onClick={() => setShowCanvas(!showCanvas)}
+              className="bg-opacity-50 hover:bg-opacity-70 rounded-lg bg-black px-3 py-2 text-white transition-all"
+            >
+              {showCanvas ? '감지 숨기기' : '감지 표시'}
+            </button>
+            <button
+              onClick={() => setIsNightMode(!isNightMode)}
+              className="bg-opacity-50 hover:bg-opacity-70 rounded-lg bg-black px-3 py-2 text-white transition-all"
+            >
+              {isNightMode ? '☀️' : '🌙'}
+            </button>
           </div>
-        )}
-      </div>
 
-      <div className="mt-4 p-4">
-        {detectedBus && (
-          <div
-            className={`mb-4 rounded-full p-4 text-center ${
-              isDetectedBusArriving ? 'bg-[#ffd700]' : 'bg-gray-100'
-            }`}
+          {/* 버스 번호 변경 버튼 */}
+          <button
+            onClick={() => router.push('/BusSearch')}
+            className="absolute right-2 bottom-2 rounded-full bg-[#ffd700] px-3 py-1.5 text-sm font-medium text-[#353535] shadow transition-all hover:bg-yellow-400"
+            style={{ zIndex: 3 }}
           >
-            <p className="text-7xl font-bold text-[#353535]">{detectedBus}</p>
-          </div>
-        )}
+            버스번호 등록
+          </button>
 
-        {/* Expected bus arrivals */}
-        <div className="mt-2 mb-4">
-          <p className="mb-2 font-medium">도착 예정 버스</p>
-          {hasNearbyStops ? (
-            expectedBuses.length > 0 ? (
-              <div>
-                <div className="mb-2 flex flex-wrap gap-2">
-                  {expectedBuses.map((bus, index) => (
-                    <span
-                      key={index}
-                      className="rounded-full bg-[#ffd700] px-3 py-1 text-sm font-semibold text-[#353535]"
-                    >
-                      {bus.busNumber}
-                    </span>
-                  ))}
-                </div>
-                {isRegisteredBusArriving ? (
-                  <p className="text-sm font-medium text-green-600">
-                    ✅ 등록한 버스가 도착 예정입니다!
-                  </p>
-                ) : (
-                  <p className="text-sm text-gray-500">등록한 버스는 현재 도착 예정이 아닙니다</p>
-                )}
-              </div>
-            ) : (
-              <p className="text-gray-500">도착 예정 버스가 없습니다</p>
-            )
-          ) : (
-            <p className="text-orange-500">근처에 버스 정류장이 없습니다</p>
+          {/* 수정된 Bus Arrival Notification */}
+          {showNotification && (
+            <div
+              className="absolute top-4 right-0 left-0 mx-auto w-4/5 rounded-lg bg-[#fff9db] p-4 text-center text-[#353535] shadow-lg"
+              style={{ zIndex: 50 }}
+            >
+              <p className="text-lg font-bold">등록한 버스가 도착했습니다!</p>
+              <p>{detectedBus}번 버스가 곧 도착합니다</p>
+            </div>
           )}
         </div>
 
-        {/* 디버깅용 정보 표시 (개발 중에만 사용) */}
-        {/* <div className="mt-4 rounded bg-gray-100 p-2 text-xs text-gray-600">
-          <p>📱 OCR 감지 버스: {detectedBus || '없음'}</p>
-          <p>👤 사용자 입력 버스: {getBusNumber() || '없음'}</p>
-          <p>🚌 API 도착예정 버스: {expectedBuses.map((b) => b.busNumber).join(', ') || '없음'}</p>
-          <p>🏠 근처 정류장: {hasNearbyStops ? '있음' : '없음'}</p>
-          <p>✅ 등록 버스 도착 예정: {isRegisteredBusArriving ? '예' : '아니오'}</p>
-          <p>🎯 최종 매칭: {isDetectedBusArriving ? '성공' : '실패'}</p>
-        </div> */}
+        <div className="mt-4 p-4">
+          {detectedBus && (
+            <div
+              className={`mb-4 rounded-full p-4 text-center ${
+                isDetectedBusArriving ? 'bg-[#ffd700]' : 'bg-gray-100'
+              }`}
+            >
+              <p className="text-7xl font-bold text-[#353535]">{detectedBus}</p>
+            </div>
+          )}
+
+          {/* Expected bus arrivals */}
+          <div className="mt-2 mb-4">
+            <p className="mb-2 font-medium">도착 예정 버스</p>
+            {hasNearbyStops ? (
+              expectedBuses.length > 0 ? (
+                <div>
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {expectedBuses.map((bus, index) => (
+                      <span
+                        key={index}
+                        className="rounded-full bg-[#ffd700] px-3 py-1 text-sm font-semibold text-[#353535]"
+                      >
+                        {bus.busNumber}
+                      </span>
+                    ))}
+                  </div>
+                  {isRegisteredBusArriving ? (
+                    <p className="text-sm font-medium text-green-600">
+                      ✅ 등록한 버스가 도착 예정입니다!
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-500">등록한 버스는 현재 도착 예정이 아닙니다</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-gray-500">도착 예정 버스가 없습니다</p>
+              )
+            ) : (
+              <p className="text-orange-500">근처에 버스 정류장이 없습니다</p>
+            )}
+          </div>
+
+          {/* 디버깅용 정보 표시 (개발 중에만 사용) */}
+          {/* <div className="mt-4 rounded bg-gray-100 p-2 text-xs text-gray-600">
+            <p>📱 OCR 감지 버스: {detectedBus || '없음'}</p>
+            <p>👤 사용자 입력 버스: {getBusNumber() || '없음'}</p>
+            <p>🚌 API 도착예정 버스: {expectedBuses.map((b) => b.busNumber).join(', ') || '없음'}</p>
+            <p>🏠 근처 정류장: {hasNearbyStops ? '있음' : '없음'}</p>
+            <p>✅ 등록 버스 도착 예정: {isRegisteredBusArriving ? '예' : '아니오'}</p>
+            <p>🎯 최종 매칭: {isDetectedBusArriving ? '성공' : '실패'}</p>
+          </div> */}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
