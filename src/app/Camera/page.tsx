@@ -970,14 +970,14 @@ export default function Camera() {
         </div>
 
         {/* 디버깅용 정보 표시 (개발 중에만 사용) */}
-        <div className="mt-4 rounded bg-gray-100 p-2 text-xs text-gray-600">
+        {/* <div className="mt-4 rounded bg-gray-100 p-2 text-xs text-gray-600">
           <p>📱 OCR 감지 버스: {detectedBus || '없음'}</p>
           <p>👤 사용자 입력 버스: {getBusNumber() || '없음'}</p>
           <p>🚌 API 도착예정 버스: {expectedBuses.map((b) => b.busNumber).join(', ') || '없음'}</p>
           <p>🏠 근처 정류장: {hasNearbyStops ? '있음' : '없음'}</p>
           <p>✅ 등록 버스 도착 예정: {isRegisteredBusArriving ? '예' : '아니오'}</p>
           <p>🎯 최종 매칭: {isDetectedBusArriving ? '성공' : '실패'}</p>
-        </div>
+        </div> */}
       </div>
     </div>
   );
